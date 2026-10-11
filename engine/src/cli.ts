@@ -9,19 +9,19 @@ import { resolveConfig } from './config.ts';
 import { payload, renderPage } from './page.ts';
 import { planReview, runReview } from './review.ts';
 import { scan } from './scan.ts';
-import { RulebookServer } from './server.ts';
+import { KlostiServer } from './server.ts';
 import { Store } from './store.ts';
 import type { Inventory } from './types.ts';
 
 const DEFAULT_PORT = 4711;
-const HELP = `agent-rulebook: see every rule, skill, hook and MCP server your coding agents use.
+const HELP = `klosti: see every rule, skill, hook and MCP server your coding agents use.
 
 Usage
-  agent-rulebook                 Scan, then open the app in your browser
-  agent-rulebook scan            Scan and print a summary
-  agent-rulebook review          AI review of overlaps and contradictions (uses Claude)
-  agent-rulebook build -o FILE   Write a standalone HTML page
-  agent-rulebook serve           Run the app without opening a browser
+  klosti                 Scan, then open the app in your browser
+  klosti scan            Scan and print a summary
+  klosti review          AI review of overlaps and contradictions (uses Claude)
+  klosti build -o FILE   Write a standalone HTML page
+  klosti serve           Run the app without opening a browser
 
 Options
   --root DIR      Scan this folder for projects (repeatable). Default: common code folders in your home
@@ -45,7 +45,7 @@ function notify(changes: { added: { name: string }[]; changed: { name: string }[
   };
   const parts = [describe('new', changes.added), describe('updated', changes.changed), describe('removed', changes.removed)].filter(p => !p.startsWith('0 '));
   // Text goes in as arguments so names never need AppleScript escaping.
-  const script = 'on run argv\ndisplay notification (item 1 of argv) with title "Agent Rulebook" subtitle "Your agent setup changed"\nend run';
+  const script = 'on run argv\ndisplay notification (item 1 of argv) with title "Klosti" subtitle "Your agent setup changed"\nend run';
   spawn('osascript', ['-e', script, parts.join(' · ')], { stdio: 'ignore', detached: true }).unref();
 }
 
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     }
     case 'build': {
       const inventory = store.inventory().files ? store.inventory() as Inventory : doScan();
-      const out = resolve(values.out ?? 'agent-rulebook.html');
+      const out = resolve(values.out ?? 'klosti.html');
       writeFileSync(out, renderPage(payload(store, analyze(inventory, store.judgements()))));
       console.log(`Wrote ${out}`);
       return;
@@ -112,12 +112,12 @@ async function main(): Promise<void> {
     case 'serve':
     case 'open': {
       doScan();
-      const server = new RulebookServer(store, config, {
+      const server = new KlostiServer(store, config, {
         port, watch: !values['no-watch'],
         onChange: s => console.log(JSON.stringify({ at: new Date().toISOString(), event: 'changed', ...s })),
       });
       const url = await server.start();
-      console.log(`Agent Rulebook running at ${url}  (Ctrl+C to stop)`);
+      console.log(`Klosti running at ${url}  (Ctrl+C to stop)`);
       if (command === 'open') openBrowser(url);
       const stop = (): void => { void server.stop().then(() => process.exit(0)); };
       process.on('SIGINT', stop);

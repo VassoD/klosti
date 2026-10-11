@@ -10,7 +10,7 @@ import sys
 BASE = Path(__file__).resolve().parents[1]
 LOCK_FILE = BASE / 'data/.refresh.lock'
 NOTIFY_NAME_LIMIT = 3
-NOTIFICATION_TITLE = 'Agent Rulebook'
+NOTIFICATION_TITLE = 'Klosti'
 
 def run(script):
     result = subprocess.run([sys.executable, str(BASE / 'scripts' / script)], capture_output=True, text=True, cwd=BASE)

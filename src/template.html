@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Agent Rulebook</title>
+<title>Klosti</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23f6f4ef%22/%3E%3Cmask%20id%3D%22m%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%23fff%22/%3E%3Cpath%20d%3D%22M28%2026.5C34%2030%2046%2032%2056%2028%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%2211%22%20stroke-linecap%3D%22round%22/%3E%3C/mask%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23bd5b3b%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M8%2048C18%2048%2026%2040%2032%2030C37%2022%2042%2013%2034%2012C25%2011%2022%2023%2028%2026.5%22%20mask%3D%22url%28%23m%29%22/%3E%3Cpath%20d%3D%22M28%2026.5C34%2030%2046%2032%2056%2028%22/%3E%3C/g%3E%3C/svg%3E">
 <style>
 :root{color-scheme:light;
 --paper:#f6f4ef;--paper-2:#efece5;--card:#fffefb;--ink:#22201c;--ink-2:#4a463f;--muted:#7a756b;--line:#e3dfd5;--line-2:#d6d1c5;
@@ -26,7 +27,8 @@ code,.path{font-family:var(--mono);font-size:.86em}
 [hidden]{display:none!important}
 .app{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
 .side{position:sticky;top:0;height:100vh;overflow:auto;background:var(--paper-2);border-right:1px solid var(--line);padding:26px 18px 20px;display:flex;flex-direction:column;gap:26px}
-.brand{display:flex;align-items:center;gap:10px;font:600 21px/1 var(--serif);letter-spacing:-.3px;padding:0 8px}
+.brand{display:flex;align-items:center;gap:9px;font:600 22px/1 var(--serif);letter-spacing:-.4px;padding:0 8px}
+.brand .mark{flex:none}
 .nav{display:grid;gap:2px}
 .nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:var(--radius-sm);color:var(--ink-2);font-size:14px}
 .nav button:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
@@ -228,7 +230,7 @@ dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
 <body>
 <div class="app">
 <aside class="side">
-  <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="5" y="3" width="16" height="5" rx="2" fill="var(--line-2)"/><rect x="3" y="10" width="20" height="5" rx="2" fill="var(--ink-2)" opacity=".55"/><rect x="1" y="17" width="24" height="6" rx="2" fill="var(--clay)"/></svg>Rulebook</div>
+  <div class="brand"><svg class="mark" width="30" height="30" viewBox="0 0 64 64" aria-hidden="true"><mask id="brand-cut"><rect width="64" height="64" fill="#fff"/><path d="M28 26.5C34 30 46 32 56 28" fill="none" stroke="#000" stroke-width="10.5" stroke-linecap="round"/></mask><g fill="none" stroke="var(--clay)" stroke-width="6.5" stroke-linecap="round"><path d="M8 48C18 48 26 40 32 30C37 22 42 13 34 12C25 11 22 23 28 26.5" mask="url(#brand-cut)"/><path d="M28 26.5C34 30 46 32 56 28"/></g></svg>klosti</div>
   <nav class="nav" aria-label="Sections">
     <button data-view="overview"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4.5l3 1.8"/></svg>Overview<span class="n" id="n-findings"></span></button>
     <button data-view="lens"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6.5 10 3l7 3.5-7 3.5z"/><path d="m3 10 7 3.5 7-3.5M3 13.5 10 17l7-3.5"/></svg>Where things apply</button>
@@ -267,7 +269,7 @@ const DISMISS_KEY='rulebook-dismissed';
 const loadDismissed=()=>{try{return new Set(JSON.parse(localStorage.getItem(DISMISS_KEY)||'[]'));}catch(e){return new Set();}};
 const dismissed=loadDismissed();
 const saveDismissed=()=>{try{localStorage.setItem(DISMISS_KEY,JSON.stringify([...dismissed]));}catch(e){}};
-const API=window.RULEBOOK_API||null;
+const API=window.KLOSTI_API||null;
 const PROTECTED=['/plugins/','/skills/synced/','/skills/.system/','/skills-cursor/','/builtin/skills/'];
 const canTrash=(t,path)=>!!API&&['skill','command','subagent'].includes(t.kind)&&!t.plugin&&!PROTECTED.some(m=>path.includes(m));
 function removalNote(t){
@@ -275,12 +277,12 @@ function removalNote(t){
   if(t.plugin){
     const claude=t.agents.includes('Claude');
     const action=API&&claude?`<button class="btn-danger" data-disable-plugin="${t.id}">Disable the ${esc(pluginName(t.plugin))} plugin</button>`:'';
-    const how=claude?(API?'':' To do it from here, open it in the app with <code>npx agent-rulebook</code>.'):' Set <code>enabled = false</code> for it in <code>~/.codex/config.toml</code>.';
+    const how=claude?(API?'':' To do it from here, open it in the app with <code>npx klosti</code>.'):' Set <code>enabled = false</code> for it in <code>~/.codex/config.toml</code>.';
     return`<div class="remove-box"><span>Part of the ${esc(pluginName(t.plugin))} plugin. A single plugin skill cannot be removed, because the next update would bring it back. You can disable the whole plugin.${how}</span>${action}</div>`;
   }
   if(t.source==='synced')return'<div class="remove-box"><span>Synced from your claude.ai account. Remove it on claude.ai under Settings, Capabilities, otherwise it comes back.</span></div>';
   if(t.source==='system')return`<div class="remove-box"><span>Built into ${esc(t.agents[0])}. It cannot be removed.</span></div>`;
-  if(!API)return'<div class="remove-box"><span>To move this to the Trash from here, open it in the app with <code>npx agent-rulebook</code>.</span></div>';
+  if(!API)return'<div class="remove-box"><span>To move this to the Trash from here, open it in the app with <code>npx klosti</code>.</span></div>';
   return'';
 }
 const live=()=>D.findings.filter(f=>!dismissed.has(f.id));
@@ -349,7 +351,7 @@ function overview(){
   if(state.sev==='dismissed'&&!dismissed.size)state.sev='all';
   const canReview=!!API&&(!D.ai||!!D.ai.via);
   const reviewText=D.review.done?`${D.review.total-D.review.done} of ${D.review.total} places changed since the last AI review, or were never reviewed.`:'Overlaps below come from matching words only.';
-  const reviewAction=canReview?`<button class="btn-ai" data-run-review="1">Review now</button>`:D.ai&&!D.ai.via?`<span>${esc(D.ai.detail)}</span>`:`<span>Run <code>npx agent-rulebook review</code> to have Claude check them.</span>`;
+  const reviewAction=canReview?`<button class="btn-ai" data-run-review="1">Review now</button>`:D.ai&&!D.ai.via?`<span>${esc(D.ai.detail)}</span>`:`<span>Run <code>npx klosti review</code> to have Claude check them.</span>`;
   const review=D.review.done<D.review.total?`<div class="review-note"><span class="sev medium"></span><div style="flex:1">${reviewText} Claude checks for duplicates and contradictions, and only reviews what changed.</div>${reviewAction}</div>`:'';
   return`<h1 class="lede">${esc(lede)}</h1>
   <p class="lede-sub">Your agents can reach ${plural(count('skill'),'skill')}, ${plural(count('rule'),'rule')}, ${plural(count('mcp'),'mcp')} and ${plural(count('hook'),'hook')} on this Mac.${high&&medium?` Another ${medium} overlaps are worth checking.`:''} Each item below says what happens today and what you can do.</p>
@@ -365,7 +367,7 @@ function findingCard(f,forceOpen){
   const editable=!!API&&f.kind==='contradiction';
   const quoteAction=(q,i)=>!editable?'':q.removed?(q.backup?`<button class="btn-quiet" data-restore-line="${esc(q.backup)}" data-open="${f.id}">Restore</button>`:''):`<button class="btn-danger" data-del-line="${f.id}" data-quote="${i}">Delete this line</button>`;
   const quotes=(f.quotes||[]).map((q,i)=>`<div class="quote${q.removed?' removed':''}" id="q-${f.id}-${i}"><div class="quote-row"><div><span class="text">${esc(q.text)}</span>${q.removed?'<span class="done">Deleted</span>':''}<span class="path">${esc(q.file)}</span></div>${quoteAction(q,i)}</div></div>`).join('');
-  const editHint=f.kind==='contradiction'&&!API&&(f.quotes||[]).length?'<p class="muted" style="font-size:13px;margin:0 0 12px">To delete one side of this from here, open it in the app with <code>npx agent-rulebook</code>.</p>':'';
+  const editHint=f.kind==='contradiction'&&!API&&(f.quotes||[]).length?'<p class="muted" style="font-size:13px;margin:0 0 12px">To delete one side of this from here, open it in the app with <code>npx klosti</code>.</p>':'';
   const source=f.reviewed?'Reviewed by Claude':f.verdict==='candidate'?'Word match, not reviewed':f.estimate?'Estimate':'';
   const gone=dismissed.has(f.id);
   return`<article class="finding${open?' is-open':''}${gone?' is-dismissed':''}" data-card="${f.id}"><button data-finding="${f.id}" aria-expanded="${open}"><div><div class="meta"><span class="sev ${f.severity}">${SEV_LABEL[f.severity]}</span><span>${esc(KIND_LABEL[f.kind]||f.kind)}${f.partlyFixed?', partly fixed':''}</span><span>${esc(f.where)}</span>${agentList(f.agents)}${source?`<span>${source}</span>`:''}</div><h3>${esc(f.title)}</h3><p class="sum">${esc(f.summary)}</p></div><span class="caret" aria-hidden="true">›</span></button>
@@ -383,7 +385,11 @@ function lens(){
   const own=here.filter(t=>t.global&&!isPlugin(t)),plugin=here.filter(t=>t.global&&isPlugin(t)),local=here.filter(t=>!t.global);
   const strata=`<div class="strata" aria-label="Layers"><div class="stratum l0"><div><h3>Global</h3><p>Your own files, plus anything built in or synced, that apply everywhere</p></div><span class="count">${own.length}</span></div><div class="stratum l1"><div><h3>Plugins</h3><p>${esc([...new Set(plugin.map(t=>pluginName(t.plugin)))].join(', ')||'No plugins enabled')}</p></div><span class="count">${plugin.length}</span></div><div class="stratum l2"><div><h3>${pid?esc(pname):'No project'}</h3><p>${pid?'Only here, on top of the layers above':'Pick a project to add its own layer'}</p></div><span class="count">${local.length}</span></div></div>`;
   const rules=here.filter(t=>t.kind==='rule'&&!t.empty).sort((a,b)=>(a.global===b.global?a.paths[0].length-b.paths[0].length:a.global?-1:1));
-  const ruleList=rules.length?`<ol class="load-order">${rules.map(t=>`<li><div><button class="chip" data-thing="${t.id}">${esc(t.name)}</button> ${scopeChip(t)} ${t.loadsWhen==='nested'?'<span class="muted" style="font-size:12px">loads when working in that folder</span>':''}<div class="path">${esc(short(t.paths.find(p=>pid?p.startsWith(pid):true)||t.paths[0]))}</div></div></li>`).join('')}</ol>`:'<p class="muted">No rule files load here.</p>';
+  const emptyGlobals=here.filter(t=>t.kind==='rule'&&t.empty&&t.global);
+  const emptyNote=emptyGlobals.map(t=>`<p class="muted" style="font-size:13px;margin:10px 0 0"><button class="chip" data-thing="${t.id}">${esc(short(t.paths[0]))}</button> exists but is empty, so ${esc(agent)} gets no global rules. Rules you add there apply in every project.</p>`).join('');
+  const withRules=projectOpts.filter(p=>D.things.some(t=>t.kind==='rule'&&!t.empty&&t.agents.includes(agent)&&t.projects.some(x=>x.id===p.id)));
+  const pickHint=!pid&&withRules.length?`<p class="muted" style="font-size:13px;margin:10px 0 0">Project rules load on top when ${esc(agent)} works inside a project. ${withRules.length} ${withRules.length===1?'project has':'projects have'} its own: ${withRules.slice(0,6).map(p=>`<button class="chip" data-lens-project="${esc(p.id)}">${esc(p.name)}</button>`).join(' ')}</p>`:'';
+  const ruleList=(rules.length?`<ol class="load-order">${rules.map(t=>`<li><div><button class="chip" data-thing="${t.id}">${esc(t.name)}</button> ${scopeChip(t)} ${t.loadsWhen==='nested'?'<span class="muted" style="font-size:12px">loads when working in that folder</span>':''}<div class="path">${esc(short(t.paths.find(p=>pid?p.startsWith(pid):true)||t.paths[0]))}</div></div></li>`).join('')}</ol>`:`<p class="muted">No rule files with content load here.</p>`)+emptyNote+pickHint;
   const grouped=items=>{const groups=new Map();items.forEach(t=>{const p=packOf(t);if(!groups.has(p.id))groups.set(p.id,{...p,items:[]});groups.get(p.id).items.push(t);});return[...groups.values()].sort((a,b)=>b.items.length-a.items.length).map(g=>`<div class="group"><div class="group-head"><b>${esc(g.name)}</b>${g.items.length}</div><div class="tiles">${g.items.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<button class="chip" data-thing="${t.id}" title="${esc(t.description)}">${esc(t.name)}${findingsFor(t.id).some(f=>f.severity!=='low')?' <span style="color:var(--high)">●</span>':''}</button>`).join('')}</div></div>`).join('');};
   const band=(title,why,body)=>`<section class="band"><div><h3>${title}</h3><p class="why">${why}</p></div><div>${body}</div></section>`;
   const skills=here.filter(t=>t.kind==='skill'||t.kind==='command');
@@ -601,7 +607,7 @@ function confirmThen(button,action){
 }
 async function callApi(path,body){
   try{
-    const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Rulebook-Token':API.token},body:JSON.stringify(body)});
+    const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Klosti-Token':API.token},body:JSON.stringify(body)});
     const reply=await res.json().catch(()=>({error:'Unexpected reply from the server.'}));
     if(!res.ok)throw new Error(reply.error||'That did not work.');
     if(reply.preview)return reply.preview;
@@ -609,7 +615,7 @@ async function callApi(path,body){
     try{sessionStorage.setItem('rulebook-flash',JSON.stringify({message:reply.message,undo:reply.undo||null,open:reply.open||body.open||null,undoResolve:reply.undoResolve||null,resolvedId:reply.undoResolve?body.finding:null}));}catch(e){}
     location.reload();
   }catch(err){
-    const msg=err instanceof TypeError?'The Agent Rulebook app is not running. Start it with npx agent-rulebook.':err.message;
+    const msg=err instanceof TypeError?'Klosti is not running. Start it with npx klosti.':err.message;
     showToast(msg,null);
     document.querySelectorAll('.line-confirm').forEach(el=>el.remove());
     document.querySelectorAll('.btn-danger:disabled').forEach(b=>{b.disabled=false;b.classList.remove('confirming');b.textContent='Try again';});
@@ -654,6 +660,8 @@ const VIEWS=['overview','lens','inventory','guide','changes'];
 function go(view){state.view=view;if(location.hash.slice(1)!==view)history.replaceState(null,'','#'+view);render();window.scrollTo(0,0);}
 addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v)&&v!==state.view){state.view=v;render();}});
 const initial=location.hash.slice(1);if(VIEWS.includes(initial))state.view=initial;
+// The desktop app's window has no browser menu, so Cmd+R / Ctrl+R / F5 are handled here.
+document.addEventListener('keydown',e=>{if(e.key==='F5'||((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='r')){e.preventDefault();location.reload();}});
 const VERSION_POLL_MS=20000;
 if(API){
   $('rescan').hidden=false;

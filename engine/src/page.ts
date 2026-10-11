@@ -5,7 +5,8 @@ import { aiAvailability } from './ai.ts';
 import type { Store } from './store.ts';
 import type { Analysis, Inventory } from './types.ts';
 
-const TEMPLATE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'template.html');
+/** The desktop app passes the bundled template's path; the npm package finds it next to the code. */
+const templatePath = (): string => process.env.KLOSTI_TEMPLATE ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'template.html');
 
 export interface PagePayload extends Record<string, unknown> {
   review: { done: number; total: number; lastAt: string | null };
@@ -29,6 +30,6 @@ export function payload(store: Store, analysis: Analysis): PagePayload {
 /** The whole app is one HTML file with the data embedded, so it also works opened straight from disk. */
 export function renderPage(data: PagePayload, api: { token: string } | null = null): string {
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  const script = api ? `<script>window.RULEBOOK_API=${JSON.stringify(api)};</script>` : '';
-  return readFileSync(TEMPLATE, 'utf8').replace('</head>', `${script}</head>`).replace('__DATA__', () => json);
+  const script = api ? `<script>window.KLOSTI_API=${JSON.stringify(api)};</script>` : '';
+  return readFileSync(templatePath(), 'utf8').replace('</head>', `${script}</head>`).replace('__DATA__', () => json);
 }

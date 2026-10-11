@@ -26,7 +26,7 @@ const Body = z.object({
 export interface ServerOptions { port: number; watch: boolean; onChange?: (summary: ChangeSummary) => void }
 export interface ChangeSummary { added: string[]; changed: string[]; removed: string[] }
 
-export class RulebookServer {
+export class KlostiServer {
   private readonly token = randomBytes(24).toString('base64url');
   private readonly actions: Actions;
   private readonly watchers: FSWatcher[] = [];
@@ -36,6 +36,8 @@ export class RulebookServer {
   /** Bumped on every rescan so open pages know to reload. */
   private version = Date.now();
   private busy: Promise<unknown> = Promise.resolve();
+  /** The real port, which differs from options.port when 0 asked the OS for a free one. */
+  private port = 0;
 
   constructor(private readonly store: Store, private readonly config: ResolvedConfig, private readonly options: ServerOptions) {
     this.actions = new Actions(store, config);
@@ -51,8 +53,10 @@ export class RulebookServer {
   async start(): Promise<string> {
     this.server = createServer((req, res) => { void this.handle(req, res); });
     await new Promise<void>((resolve, reject) => { this.server!.once('error', reject); this.server!.listen(this.options.port, '127.0.0.1', resolve); });
+    const address = this.server.address();
+    this.port = typeof address === 'object' && address ? address.port : this.options.port;
     if (this.options.watch) this.startWatching();
-    return `http://127.0.0.1:${this.options.port}/`;
+    return `http://127.0.0.1:${this.port}/`;
   }
 
   async stop(): Promise<void> {
@@ -83,7 +87,7 @@ export class RulebookServer {
   }
 
   private allowedHost(req: IncomingMessage): boolean {
-    return [`127.0.0.1:${this.options.port}`, `localhost:${this.options.port}`].includes(req.headers.host ?? '');
+    return [`127.0.0.1:${this.port}`, `localhost:${this.port}`].includes(req.headers.host ?? '');
   }
 
   private send(res: ServerResponse, status: number, body: unknown, type = 'application/json'): void {
@@ -110,7 +114,7 @@ export class RulebookServer {
       return this.send(res, 200, renderPage({ ...payload(this.store, this.actions.current()), version: this.version }, { token: this.token }), 'text/html; charset=utf-8');
     }
     if (req.method === 'GET' && path === '/api/version') return this.send(res, 200, { version: this.version });
-    if (req.method !== 'POST' || req.headers['x-rulebook-token'] !== this.token) return this.send(res, 403, { error: 'This page is out of date. Reload it.' });
+    if (req.method !== 'POST' || req.headers['x-klosti-token'] !== this.token) return this.send(res, 403, { error: 'This page is out of date. Reload it.' });
     try {
       const body = await this.readBody(req);
       const reply = await this.route(path ?? '', body);
