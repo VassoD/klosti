@@ -304,7 +304,7 @@ const AGENTS=['Claude','Codex','Cursor','Gemini'];
 const NEW_WINDOW_DAYS=14,DAY_MS=864e5,ROW_LIMIT=40;
 const KIND={rule:{one:'rule file',many:'rule files',title:'Rules'},skill:{one:'skill',many:'skills',title:'Skills'},command:{one:'command',many:'commands',title:'Commands'},subagent:{one:'subagent',many:'subagents',title:'Subagents'},hook:{one:'hook',many:'hooks',title:'Hooks'},mcp:{one:'MCP server',many:'MCP servers',title:'MCP servers'},'output-style':{one:'output style',many:'output styles',title:'Output styles'}};
 const KIND_ORDER=['skill','rule','command','subagent','hook','mcp'];
-const state={view:'overview',sev:'all',lensAgent:'Claude',lensProject:'',kind:'skill',invAgent:'all',invScope:'all',query:'',open:new Set(),expanded:new Set()};
+const state={view:'overview',sev:'all',cat:'all',lensAgent:'Claude',lensProject:'',kind:'skill',invAgent:'all',invScope:'all',query:'',open:new Set(),expanded:new Set()};
 const baseline=new Date(D.baselineAt),scanned=new Date(D.scannedAt);
 const isNew=t=>!!t.firstSeen&&new Date(t.firstSeen)>baseline&&scanned-new Date(t.firstSeen)<NEW_WINDOW_DAYS*DAY_MS;
 const DISMISS_KEY='rulebook-dismissed';
@@ -328,6 +328,18 @@ function removalNote(t){
   return'';
 }
 const live=()=>D.findings.filter(f=>!dismissed.has(f.id));
+const CATEGORIES=[['all','All'],['skills','Skills'],['rules','Rules'],['skills-rules','Skills vs rules'],['hooks','Hooks'],['mcp','MCP servers']];
+const SKILL_KINDS=new Set(['skill','command','subagent']);
+/** One type per issue, so each list holds one kind of thing. A skill clashing with a rule gets its own type. */
+function categoryOf(f){
+  const kinds=new Set(f.items.map(id=>byId.get(id)?.kind).filter(Boolean));
+  if(kinds.has('hook')||f.kind==='hidden')return'hooks';
+  if(kinds.has('mcp'))return'mcp';
+  const skills=[...kinds].some(k=>SKILL_KINDS.has(k));
+  if(skills&&kinds.has('rule'))return'skills-rules';
+  if(kinds.has('rule'))return'rules';
+  return'skills';
+}
 const findingsFor=id=>live().filter(f=>f.items.includes(id));
 const present=AGENTS.filter(a=>D.things.some(t=>t.agents.includes(a)));
 
@@ -390,7 +402,9 @@ function overview(){
     return`<div class="agent-line">${agentDot(a)}<p>${parts.join(', ')}</p><button data-lens-agent="${a}">See where</button></div>`;
   }).join('');
   const sevs=[['all','All'],['high','Act on these'],['medium','Worth checking'],['low','For your information']];
-  const list=state.sev==='dismissed'?D.findings.filter(f=>dismissed.has(f.id)):live().filter(f=>state.sev==='all'||f.severity===state.sev);
+  const shown=live().filter(f=>state.cat==='all'||categoryOf(f)===state.cat);
+  const list=state.sev==='dismissed'?D.findings.filter(f=>dismissed.has(f.id)&&(state.cat==='all'||categoryOf(f)===state.cat)):shown.filter(f=>state.sev==='all'||f.severity===state.sev);
+  const cats=CATEGORIES.filter(([v])=>v==='all'||live().some(f=>categoryOf(f)===v));
   if(state.sev==='dismissed'&&!dismissed.size)state.sev='all';
   const canReview=!!API&&(!D.ai||!!D.ai.via);
   const reviewText=D.review.done?`${D.review.total-D.review.done} of ${D.review.total} places changed since the last AI review, or were never reviewed.`:'Overlaps below come from matching words only.';
@@ -402,7 +416,7 @@ function overview(){
   <h2 class="section">Worth a look</h2>
   <p class="section-sub">Open an item to see what happens and the files involved.</p>
   ${review}
-  <div class="filters-row"><div class="seg" role="group" aria-label="Filter by importance">${sevs.map(([v,l])=>`<button data-sev="${v}" aria-pressed="${state.sev===v}">${l} <span class="muted">${v==='all'?live().length:live().filter(f=>f.severity===v).length}</span></button>`).join('')}${dismissed.size?`<button data-sev="dismissed" aria-pressed="${state.sev==='dismissed'}">Dismissed <span class="muted">${dismissed.size}</span></button>`:''}</div></div>
+  <div class="filters-row"><div class="seg" role="group" aria-label="Filter by type">${cats.map(([v,l])=>`<button data-cat="${v}" aria-pressed="${state.cat===v}">${l} <span class="muted">${v==='all'?live().length:live().filter(f=>categoryOf(f)===v).length}</span></button>`).join('')}</div><div class="seg" role="group" aria-label="Filter by importance">${sevs.map(([v,l])=>`<button data-sev="${v}" aria-pressed="${state.sev===v}">${l} <span class="muted">${v==='all'?shown.length:shown.filter(f=>f.severity===v).length}</span></button>`).join('')}${dismissed.size?`<button data-sev="dismissed" aria-pressed="${state.sev==='dismissed'}">Dismissed <span class="muted">${dismissed.size}</span></button>`:''}</div></div>
   <div class="findings">${list.map(f=>findingCard(f)).join('')||`<div class="empty-state">${state.sev==='all'?'Nothing left to look at. Dismissed items are under Dismissed.':'Nothing here. Try another filter.'}</div>`}</div>`;
 }
 function findingCard(f,forceOpen){
@@ -702,6 +716,7 @@ document.addEventListener('click',e=>{
   const d=b.dataset;
   if(d.view){go(d.view);}
   else if(d.sev){state.sev=d.sev;render();}
+  else if(d.cat){state.cat=d.cat;render();}
   else if(d.delLine){previewLine(d.delLine,+d.quote,b);}
   else if(d.confirmLine){b.disabled=true;b.textContent='Deleting…';callApi('/api/rule-line',{finding:d.confirmLine,quote:+d.quote,expect:b.closest('.line-confirm').dataset.line});}
   else if(d.restoreBackups){confirmThen(b,()=>callApi('/api/undo',{backups:JSON.parse(d.restoreBackups)}));}
@@ -725,7 +740,11 @@ document.addEventListener('click',e=>{
   else if(d.expand){state.expanded.add(d.expand);render();}
 });
 document.addEventListener('change',e=>{if(e.target.id==='lens-project'){state.lensProject=e.target.value;render();}});
-document.addEventListener('input',e=>{if(e.target.id==='q'){state.query=e.target.value;const pos=e.target.selectionStart;render();const q=$('q');q.focus();q.setSelectionRange(pos,pos);}});
+document.addEventListener('input',e=>{
+  const field={q:'query'}[e.target.id];
+  if(!field)return;
+  state[field]=e.target.value;const pos=e.target.selectionStart;render();const input=$(e.target.id);input.focus();input.setSelectionRange(pos,pos);
+});
 const CONFIRM_MS=4000;
 function confirmThen(button,action){
   if(button.classList.contains('confirming')){button.disabled=true;button.textContent='Working…';action();return;}
