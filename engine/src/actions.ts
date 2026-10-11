@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
@@ -6,7 +6,7 @@ import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { z } from 'zod';
 import { askClaude } from './ai.ts';
 import { analyze, short } from './analyze.ts';
-import { HOME, type ResolvedConfig } from './config.ts';
+import { AGENT_DIRS, expandPath, HOME, KNOWN_AGENTS, saveIgnored, saveUserSettings, type ResolvedConfig } from './config.ts';
 import { nowIso, posix, scan } from './scan.ts';
 import type { Store } from './store.ts';
 import type { Analysis, Finding, Inventory, Judgements, Quote, RuleConflict, Thing } from './types.ts';
@@ -18,6 +18,8 @@ const FUZZY_MATCH_RATIO = 0.82;
 const FIX_FILE_CHARS = 40000;
 const MAX_PROPOSALS = 20;
 const PLUGIN_COMMAND_TIMEOUT_MS = 60000;
+const FOLDER_PICKER_TIMEOUT_MS = 10 * 60 * 1000;
+const USER_CANCELLED = -128;
 
 /** A request the app refuses, with a message that is safe to show. */
 export class ActionRefused extends Error {
@@ -139,6 +141,33 @@ function disablePlugin(thing: Thing): void {
   if (result.status !== 0) throw new ActionRefused(`Claude Code could not disable ${thing.plugin}: ${(result.stderr || result.stdout || String(result.error ?? '')).trim().slice(0, 200)}`);
 }
 
+// ---- native folder picker ------------------------------------------------------------
+
+/** Opens the system's folder chooser. Resolves to null when the user cancels. */
+export function pickFolder(prompt: string): Promise<string | null> {
+  const os = platform();
+  const [command, args] = os === 'darwin'
+    ? ['osascript', ['-e', 'on run argv', '-e', 'tell application "System Events" to activate', '-e', 'return POSIX path of (choose folder with prompt (item 1 of argv) default location (path to home folder))', '-e', 'end run', prompt]]
+    : os === 'win32'
+      ? ['powershell', ['-NoProfile', '-Command', `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = $args[0]; if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }`, prompt]]
+      : ['zenity', ['--file-selection', '--directory', `--title=${prompt}`]];
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args as string[], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', err = '';
+    const timer = setTimeout(() => child.kill(), FOLDER_PICKER_TIMEOUT_MS);
+    child.stdout.on('data', (chunk: Buffer) => { out += chunk.toString(); });
+    child.stderr.on('data', (chunk: Buffer) => { err += chunk.toString(); });
+    child.on('error', () => { clearTimeout(timer); reject(new ActionRefused('This computer has no folder picker Klosti can open. Add the folder in the config file instead.')); });
+    child.on('close', code => {
+      clearTimeout(timer);
+      const path = out.trim().replace(/[\\/]+$/, '');
+      if (code === 0 && path) return resolve(path);
+      if (code !== 0 && !err.includes(String(USER_CANCELLED)) && os === 'darwin' && err.trim()) return reject(new ActionRefused('The folder picker could not open.'));
+      resolve(null);
+    });
+  });
+}
+
 // ---- rescan without losing the AI review --------------------------------------------
 
 type ConflictEdit = (conflict: RuleConflict) => RuleConflict;
@@ -150,6 +179,11 @@ type ConflictEdit = (conflict: RuleConflict) => RuleConflict;
 export function rescan(store: Store, config: ResolvedConfig, editConflict?: ConflictEdit): Analysis {
   const judgements = store.judgements();
   const previous = store.inventory();
+  if (!previous.files) {
+    const { inventory } = scan(config, previous);
+    store.saveInventory(inventory);
+    return analyze(inventory, judgements);
+  }
   const before = analyze(previous as Inventory, judgements);
   const { inventory } = scan(config, previous);
   store.saveInventory(inventory);
@@ -328,6 +362,56 @@ Rules for your answer:
     this.store.logAction({ at: nowIso(), kind: 'trash', name: basename(target), files: [short(target)] });
     rescan(this.store, this.config);
     return { message: `Moved ${basename(target)} to the Trash. You can restore it from there.` };
+  }
+
+  /** Stops scanning a folder, or scans it again. The list lives in the user's config file. */
+  ignoreFolder(folder: string, ignore: boolean): ActionReply {
+    const path = expandPath(folder.trim()).replace(/[\\/]+$/, '');
+    if (!isInside(path, HOME) || path === HOME) throw new ActionRefused('Pick a folder inside your home folder.');
+    if (AGENT_DIRS.some(d => path === join(HOME, d))) throw new ActionRefused('This is an agent settings folder. Ignoring it would hide every global rule and skill.');
+    const ignored = this.config.ignored;
+    if (ignore) {
+      if (!existsSync(path) || !lstatSync(path).isDirectory()) throw new ActionRefused('That folder does not exist.');
+      if (ignored.includes(path)) throw new ActionRefused('That folder is already ignored.');
+      ignored.push(path);
+    } else {
+      const at = ignored.indexOf(path);
+      if (at < 0) throw new ActionRefused('That folder is not ignored.');
+      ignored.splice(at, 1);
+    }
+    saveIgnored(ignored);
+    this.store.logAction({ at: nowIso(), kind: ignore ? 'ignore-folder' : 'unignore-folder', files: [short(path)] });
+    rescan(this.store, this.config);
+    return { message: ignore ? `Stopped scanning ${short(path)}.` : `Scanning ${short(path)} again.` };
+  }
+
+  /** Which code folders to scan and which agents the user works with. Agent settings folders are always scanned. */
+  saveSettings(roots: string[], agents: string[], ignored?: string[]): ActionReply {
+    const folders = [...new Set(roots.map(r => expandPath(r.trim()).replace(/[\\/]+$/, '')).filter(Boolean))];
+    if (!folders.length) throw new ActionRefused('Pick at least one folder to scan.');
+    const missing = folders.find(f => !existsSync(f) || !lstatSync(f).isDirectory());
+    if (missing) throw new ActionRefused(`${short(missing)} is not a folder.`);
+    if (folders.includes(HOME)) throw new ActionRefused('Scanning your whole home folder would be slow. Pick the folders where your code lives.');
+    const chosen = KNOWN_AGENTS.filter(a => agents.includes(a));
+    if (!chosen.length) throw new ActionRefused('Pick at least one agent.');
+    const skipped = ignored === undefined ? this.config.ignored : [...new Set(ignored.map(p => expandPath(p.trim()).replace(/[\\/]+$/, '')).filter(Boolean))];
+    const outside = skipped.find(p => !isInside(p, HOME) || p === HOME || AGENT_DIRS.some(d => p === join(HOME, d)));
+    if (outside) throw new ActionRefused(`${short(outside)} cannot be ignored.`);
+    saveUserSettings({ roots: folders, replaceDefaultRoots: true, agents: chosen.length === KNOWN_AGENTS.length ? [] : chosen, ignore: skipped });
+    this.config.ignored.splice(0, this.config.ignored.length, ...skipped);
+    this.config.codeRoots.splice(0, this.config.codeRoots.length, ...folders);
+    this.config.agents.splice(0, this.config.agents.length, ...(chosen.length === KNOWN_AGENTS.length ? [] : chosen));
+    this.store.logAction({ at: nowIso(), kind: 'settings', summary: `Scanning ${folders.map(short).join(', ')}${skipped.length ? `, skipping ${skipped.length} ${skipped.length === 1 ? 'folder' : 'folders'}` : ''}. Agents: ${chosen.join(', ')}.` });
+    rescan(this.store, this.config);
+    return { message: 'Settings saved. Scanned again.' };
+  }
+
+  /** The welcome screen: saves the first choices, marks onboarding done and runs the first scan. */
+  onboard(roots: string[], agents: string[], ignored: string[]): ActionReply {
+    this.saveSettings(roots, agents, ignored);
+    saveUserSettings({ onboarded: true });
+    this.config.onboarded = true;
+    return { message: 'All set. This is everything your agents can see.' };
   }
 
   disablePlugin(thingId: string): ActionReply {

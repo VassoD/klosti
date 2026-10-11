@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     }
     case 'review': {
       if (!store.inventory().files) doScan();
-      const plan = planReview(analyze(store.inventory() as Inventory, store.judgements()), store, values.force ?? false);
+      const plan = planReview(analyze(store.inventory() as Inventory, store.judgements()), store, values.force ?? false, config.agents);
       if (values['dry-run'] || !plan.jobs.length) { console.log(plan.jobs.length ? `Would make ${plan.jobs.length} calls, about ${Math.round(plan.inputChars / CHARS_PER_TOKEN).toLocaleString('en-US')} input tokens:\n  ${plan.pending.join('\n  ')}` : 'Everything is already reviewed.'); return; }
       console.log(`Reviewing ${plan.jobs.length} places with Claude...`);
       const result = await runReview(plan, store, (done, total) => process.stdout.write(`\r  ${done}/${total}`));
@@ -106,13 +106,14 @@ async function main(): Promise<void> {
     case 'build': {
       const inventory = store.inventory().files ? store.inventory() as Inventory : doScan();
       const out = resolve(values.out ?? 'klosti.html');
-      writeFileSync(out, renderPage(payload(store, analyze(inventory, store.judgements()))));
+      writeFileSync(out, renderPage(payload(store, analyze(inventory, store.judgements()), config)));
       console.log(`Wrote ${out}`);
       return;
     }
     case 'serve':
     case 'open': {
-      doScan();
+      // Before onboarding the app asks which folders to scan, so there is nothing to scan yet.
+      if (config.onboarded) doScan();
       const server = new KlostiServer(store, config, {
         port, watch: !values['no-watch'],
         onChange: s => console.log(JSON.stringify({ at: new Date().toISOString(), event: 'changed', ...s })),

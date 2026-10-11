@@ -117,9 +117,10 @@ function linkedSkillFiles(link: string, insideSkillsDir: boolean): string[] {
 }
 
 /** Walks roots like `rg --files --hidden --no-ignore`, pruning excluded folder names and not following symlinks. */
-export function discover(roots: string[], excluded: string[], errors: string[]): Discovered {
+export function discover(roots: string[], excluded: string[], errors: string[], ignored: string[] = []): Discovered {
   const found: Discovered = { rules: new Set(), skills: new Set(), config: new Map(), unreadable: [] };
   const skip = new Set(excluded);
+  const skipPaths = new Set(ignored);
   const walk = (dir: string, isRoot: boolean): void => {
     let entries;
     try { entries = readdirSync(dir, { withFileTypes: true }); }
@@ -131,12 +132,12 @@ export function discover(roots: string[], excluded: string[], errors: string[]):
     const here = basename(dir);
     for (const entry of entries) {
       const full = join(dir, entry.name);
-      if (entry.isDirectory()) { if (!skip.has(entry.name)) walk(full, false); continue; }
+      if (entry.isDirectory()) { if (!skip.has(entry.name) && !skipPaths.has(full)) walk(full, false); continue; }
       if (entry.isSymbolicLink()) {
         let target;
         try { target = statSync(full); } catch { continue; }
         if (target.isDirectory()) {
-          if (!skip.has(entry.name) && (entry.name === 'skills' || here === 'skills')) linkedSkillFiles(full, here === 'skills').forEach(p => found.skills.add(p));
+          if (!skip.has(entry.name) && !skipPaths.has(full) && (entry.name === 'skills' || here === 'skills')) linkedSkillFiles(full, here === 'skills').forEach(p => found.skills.add(p));
           continue;
         }
       }
@@ -453,9 +454,9 @@ export interface ScanResult {
 export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}): ScanResult {
   const errors: string[] = [];
   const now = nowIso();
-  const roots = [...config.codeRoots, ...config.agentRoots];
+  const roots = [...config.codeRoots, ...config.agentRoots].filter(r => !config.ignored.includes(r));
   const excluded = new Set(config.excluded);
-  const found = discover(roots, config.excluded, errors);
+  const found = discover(roots, config.excluded, errors, config.ignored);
   for (const name of HOME_RULE_FILES) if (existsSync(join(HOME, name))) found.rules.add(join(HOME, name));
   if (MANAGED_CLAUDE_MD && existsSync(MANAGED_CLAUDE_MD)) found.rules.add(MANAGED_CLAUDE_MD);
   const files: FileRecord[] = [];
@@ -491,7 +492,7 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   const installed: InstalledPlugin[] = plugins.map(p => ({ id: p.id, agent: p.agent, version: p.version, path: p.root, installedAt: p.installedAt }));
   const inventory: Inventory = {
     scannedAt: now, baselineAt: previous.extrasTracked && previous.baselineAt ? previous.baselineAt : now, extrasTracked: true,
-    roots, excluded: config.excluded, errors, files: items, extras, primaryFileCount: files.length, skillCount: skills.length,
+    roots, excluded: config.excluded, ignored: config.ignored, errors, files: items, extras, primaryFileCount: files.length, skillCount: skills.length,
     plugins: installed, history, memories: memoryIndexes(), limits: LIMITS,
   };
   return { inventory, changes };

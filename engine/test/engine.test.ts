@@ -99,7 +99,7 @@ describe('scan and analyze a fixture workspace', () => {
     write(join(app, '.claude', 'settings.local.json'), JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Write', hooks: [{ type: 'command', command: 'TOKEN=supersecret ./lint.sh' }] }] } }));
     write(join(app, '.mcp.json'), JSON.stringify({ mcpServers: { docs: { command: 'npx', args: ['@acme/docs-mcp', '--key', 'abcdefghijklmnopqrstuvwxyz0123456789'], env: { KEY: 'secret' } } } }));
     write(join(app, 'node_modules', 'pkg', 'CLAUDE.md'), 'ignored');
-    const config: ResolvedConfig = { codeRoots: [root], agentRoots: [], excluded: EXCLUDED_DIRS, dataDir: join(root, '.data') };
+    const config: ResolvedConfig = { codeRoots: [root], agentRoots: [], excluded: EXCLUDED_DIRS, ignored: [], agents: [], onboarded: true, dataDir: join(root, '.data') };
     inventory = scan(config).inventory;
   });
   after(() => rmSync(root, { recursive: true, force: true }));
@@ -115,6 +115,13 @@ describe('scan and analyze a fixture workspace', () => {
     const linked = inventory.files.find(f => f.path.includes('/.claude/skills/deploy/'));
     assert.ok(linked?.linkTarget?.endsWith('/.agents/skills/deploy/SKILL.md'));
     assert.equal(linked?.skill?.agent, 'Claude');
+  });
+
+  it('should skip a folder the user ignored', () => {
+    const config: ResolvedConfig = { codeRoots: [root], agentRoots: [], excluded: EXCLUDED_DIRS, ignored: [join(root, 'app', 'web')], agents: [], onboarded: true, dataDir: join(root, '.data') };
+    const paths = scan(config).inventory.files.filter(f => mine(f.path)).map(f => f.path);
+    assert.ok(paths.some(p => p.endsWith('/app/CLAUDE.md')), 'the rest of the project is still scanned');
+    assert.ok(!paths.some(p => p.includes('/app/web/')), 'nothing inside the ignored folder is scanned');
   });
 
   it('should never copy MCP environment variables or secret arguments', () => {

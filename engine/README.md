@@ -16,8 +16,10 @@ Requires Node 20 or later. Everything runs locally. The scanner never copies MCP
 Common code folders in your home (`side-projects`, `projects`, `code`, `dev`, `Developer`, `repos`, `Documents` and others that exist) plus agent settings folders (`~/.claude`, `~/.codex`, `~/.agents`, `~/.cursor`, `~/.gemini`). Add or replace folders in `~/.config/klosti/config.json`:
 
 ```json
-{ "roots": ["~/work/clients"], "replaceDefaultRoots": false, "exclude": ["fixtures"] }
+{ "roots": ["~/work/clients"], "replaceDefaultRoots": false, "exclude": ["fixtures"], "ignore": ["~/side-projects/old-repo"] }
 ```
+
+`exclude` skips folders with that name anywhere; `ignore` skips specific folders. The app manages `ignore` for you: "Stop scanning this project" in Where things apply, or Folders you ignore under Changes.
 
 Or pass `--root DIR` (repeatable) for a one-off scan.
 

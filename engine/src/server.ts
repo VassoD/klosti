@@ -3,9 +3,9 @@ import { watch, type FSWatcher } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { ActionRefused, Actions, rescan } from './actions.ts';
+import { ActionRefused, Actions, pickFolder, rescan } from './actions.ts';
 import { AiRefusedError, AiUnavailableError } from './ai.ts';
-import { HOME, type ResolvedConfig } from './config.ts';
+import { HOME, onboardingChoices, type ResolvedConfig } from './config.ts';
 import { payload, renderPage } from './page.ts';
 import { planReview, runReview } from './review.ts';
 import type { Store } from './store.ts';
@@ -20,7 +20,8 @@ const Body = z.object({
   finding: z.string().optional(), quote: z.number().optional(), dryRun: z.boolean().optional(), expect: z.string().optional(),
   proposal: z.string().optional(), title: z.string().optional(), resolved: z.boolean().optional(),
   backup: z.string().optional(), backups: z.array(z.string()).optional(), open: z.string().nullable().optional(),
-  id: z.string().optional(), path: z.string().optional(), force: z.boolean().optional(),
+  id: z.string().optional(), path: z.string().optional(), force: z.boolean().optional(), ignore: z.boolean().optional(),
+  roots: z.array(z.string()).optional(), agents: z.array(z.string()).optional(), ignored: z.array(z.string()).optional(),
 });
 
 export interface ServerOptions { port: number; watch: boolean; onChange?: (summary: ChangeSummary) => void }
@@ -73,6 +74,7 @@ export class KlostiServer {
   }
 
   private scheduleRescan(): void {
+    if (!this.config.onboarded) return;
     if (this.debounce) clearTimeout(this.debounce);
     this.debounce = setTimeout(() => {
       void this.serialize(() => {
@@ -111,7 +113,8 @@ export class KlostiServer {
     if (!this.allowedHost(req)) return this.send(res, 403, { error: 'Forbidden host' });
     const path = (req.url ?? '/').split('?')[0];
     if (req.method === 'GET' && (path === '/' || path === '/index.html')) {
-      return this.send(res, 200, renderPage({ ...payload(this.store, this.actions.current()), version: this.version }, { token: this.token }), 'text/html; charset=utf-8');
+      if (!this.config.onboarded) return this.send(res, 200, renderPage({ onboarding: onboardingChoices(this.config) }, { token: this.token }), 'text/html; charset=utf-8');
+      return this.send(res, 200, renderPage({ ...payload(this.store, this.actions.current(), this.config), version: this.version }, { token: this.token }), 'text/html; charset=utf-8');
     }
     if (req.method === 'GET' && path === '/api/version') return this.send(res, 200, { version: this.version });
     if (req.method !== 'POST' || req.headers['x-klosti-token'] !== this.token) return this.send(res, 403, { error: 'This page is out of date. Reload it.' });
@@ -140,10 +143,14 @@ export class KlostiServer {
       case '/api/resolve': return this.serialize(() => changed({ ...a.resolve(body.finding, body.title, body.resolved ?? true) }));
       case '/api/undo': return this.serialize(() => changed({ ...a.undo(body.backups ?? (body.backup ? [body.backup] : []), body.open ?? undefined) }));
       case '/api/trash': return this.serialize(() => changed({ ...a.trash(body.id ?? '', body.path ?? '') }));
+      case '/api/pick-folder': { const path = await pickFolder('Choose a folder where you keep code'); return path ? { path } : { cancelled: true }; }
+      case '/api/onboard': return this.serialize(() => changed({ ...a.onboard(body.roots ?? [], body.agents ?? [], body.ignored ?? []) }));
+      case '/api/settings': return this.serialize(() => changed({ ...a.saveSettings(body.roots ?? [], body.agents ?? [], body.ignored) }));
+      case '/api/ignore-folder': return this.serialize(() => changed({ ...a.ignoreFolder(body.path ?? '', body.ignore ?? true) }));
       case '/api/disable-plugin': return this.serialize(() => changed({ ...a.disablePlugin(body.id ?? '') }));
       case '/api/rescan': return this.serialize(() => { rescan(this.store, this.config); return changed({ message: 'Scanned again.' }); });
       case '/api/review': return this.serialize(async () => {
-        const plan = planReview(a.current(), this.store, body.force ?? false);
+        const plan = planReview(a.current(), this.store, body.force ?? false, this.config.agents);
         if (!plan.jobs.length) return { message: 'Everything is already reviewed.' };
         const result = await runReview(plan, this.store);
         const cost = result.costUsd ? ` About $${result.costUsd.toFixed(2)} at list price.` : '';

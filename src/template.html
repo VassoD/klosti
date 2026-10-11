@@ -204,6 +204,79 @@ select.pick{appearance:none;background:var(--card) url("data:image/svg+xml,%3Csv
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:20px 0 14px}
 .search{display:flex;flex:1 1 220px;min-width:0;background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);padding:8px 12px;font-size:14px}
 .search input{border:0;background:none;outline:none;width:100%}
+.setting-list{display:grid;gap:6px;margin:0 0 12px}
+.setting-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;cursor:pointer}
+.setting-row input{width:16px;height:16px;accent-color:var(--clay)}
+.setting-row .muted{font-size:13px}
+.root-block{display:grid;gap:6px}
+.app.is-welcome{grid-template-columns:minmax(0,1fr)}
+.app.is-welcome .side{display:none}
+.welcome{max-width:760px;margin:0 auto;padding:8px 0 64px}
+.welcome-hero{display:flex;align-items:center;gap:12px;margin:0 0 34px}
+.welcome-mark{flex:none}
+.welcome-word{font:600 30px/1 var(--serif);letter-spacing:-.5px}
+.welcome-run{flex:1;height:3px;margin-left:6px;border-radius:3px;background:linear-gradient(90deg,var(--clay),color-mix(in srgb,var(--clay) 25%,transparent));transform-origin:left;position:relative}
+.welcome-run::after{content:"";position:absolute;right:0;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;border:2.5px solid var(--clay);background:var(--paper)}
+.welcome-intro{margin:0 0 52px}
+.welcome-step{position:relative;padding-left:56px}
+.welcome-step+.welcome-step{margin-top:48px}
+.welcome-step:not(:last-child)::before{content:"";position:absolute;left:14.5px;top:34px;bottom:-50px;width:3px;border-radius:3px;background:var(--clay);transform-origin:top}
+.welcome-step h2.section{margin-top:0}
+.welcome-bead{position:absolute;left:0;top:-2px;z-index:1;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--clay);color:var(--paper);font:600 15px/1 var(--serif)}
+.welcome-bead.is-ring{top:6px;background:var(--paper);border:3px solid var(--clay)}
+.agent-pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 12px}
+.agent-card{position:relative;display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;transition:transform .25s cubic-bezier(.3,1.4,.5,1),border-color .2s,box-shadow .2s}
+.agent-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px -14px color-mix(in srgb,var(--ink) 60%,transparent)}
+.agent-card:active{transform:scale(.98)}
+.agent-card input{position:absolute;opacity:0;width:1px;height:1px}
+.agent-card:has(input:focus-visible){outline:2px solid var(--clay);outline-offset:2px}
+.agent-card:has(input:checked){border-color:color-mix(in srgb,var(--c) 50%,var(--line))}
+.agent-card.is-missing:not(:has(input:checked)){opacity:.7}
+.agent-orb{width:38px;height:38px;flex:none;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 14%,var(--card))}
+.agent-orb i{width:10px;height:10px;border-radius:50%;background:var(--c);transition:transform .4s cubic-bezier(.3,1.8,.5,1)}
+.agent-card:has(input:checked) .agent-orb i{transform:scale(1.9)}
+.agent-meta{display:grid;line-height:1.35;min-width:0}
+.agent-meta b{font-size:15px}
+.agent-meta .muted{font-size:12.5px}
+.agent-tick{margin-left:auto;width:22px;height:22px;flex:none;border-radius:50%;border:1.5px solid var(--line-2);display:grid;place-items:center;transition:background .2s,border-color .2s,transform .35s cubic-bezier(.3,1.8,.5,1)}
+.agent-tick svg{width:12px;height:12px;stroke:var(--paper);stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .25s .08s ease-out}
+.agent-card:has(input:checked) .agent-tick{background:var(--clay);border-color:var(--clay);transform:scale(1.12)}
+.agent-card:has(input:checked) .agent-tick svg{stroke-dashoffset:0}
+.welcome .count{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.welcome .sub-list.is-opening>*{animation:welcome-rise .35s backwards cubic-bezier(.2,.8,.3,1);animation-delay:calc(min(var(--i),12) * 25ms)}
+.welcome-go{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.welcome-go .btn-primary{transition:background .2s,transform .25s cubic-bezier(.3,1.6,.5,1)}
+.welcome-go .btn-primary:hover:not(:disabled){transform:translateY(-1px)}
+.welcome-progress{display:none;flex-basis:100%;height:3px;border-radius:3px;background:var(--clay-soft);overflow:hidden;max-width:320px}
+.welcome-progress::before{content:"";display:block;width:40%;height:100%;border-radius:3px;background:var(--clay);animation:welcome-shuttle 1.2s ease-in-out infinite alternate}
+.welcome.is-scanning .welcome-progress{display:block}
+.welcome.is-scanning .welcome-bead.is-ring{border-style:dashed;animation:welcome-spin 2.4s linear infinite}
+.welcome.is-shaking .welcome-go{animation:welcome-shake .4s}
+.welcome.enter>*{animation:welcome-rise .6s backwards cubic-bezier(.2,.8,.3,1);animation-delay:var(--d,0s)}
+.welcome.enter .welcome-mark path{stroke-dasharray:1;animation:welcome-draw .9s backwards cubic-bezier(.6,0,.3,1)}
+.welcome.enter .welcome-mark .tail{animation-delay:.8s;animation-duration:.45s}
+.welcome.enter .welcome-word{animation:welcome-fade .5s .6s backwards}
+.welcome.enter .welcome-run{animation:welcome-unspool 1s 1s backwards cubic-bezier(.5,0,.2,1)}
+.welcome.enter .welcome-step:not(:last-child)::before{animation:welcome-unspool-y .8s backwards cubic-bezier(.5,0,.2,1);animation-delay:calc(var(--d,0s) + .35s)}
+.welcome.enter .welcome-bead{animation:welcome-pop .5s backwards cubic-bezier(.3,1.8,.5,1);animation-delay:calc(var(--d,0s) + .1s)}
+@keyframes welcome-rise{from{opacity:0;transform:translateY(12px)}}
+@keyframes welcome-fade{from{opacity:0}}
+@keyframes welcome-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes welcome-unspool{from{transform:scaleX(0)}}
+@keyframes welcome-unspool-y{from{transform:scaleY(0)}}
+@keyframes welcome-pop{from{transform:scale(0)}}
+@keyframes welcome-spin{to{transform:rotate(1turn)}}
+@keyframes welcome-shuttle{from{transform:translateX(-10%)}to{transform:translateX(160%)}}
+@keyframes welcome-shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@media(max-width:560px){.agent-pick{grid-template-columns:1fr}.welcome-step{padding-left:46px}.welcome-run{display:none}}
+@media(prefers-reduced-motion:reduce){.welcome *,.welcome *::before,.welcome>*{animation:none!important}}
+.btn-large{font-size:15px;padding:10px 20px}
+.setting-row.root{cursor:default}
+.setting-row.root label{display:flex;gap:12px;align-items:center;cursor:pointer;min-width:0}
+.setting-row.root{grid-template-columns:1fr auto auto}
+.sub-list{display:grid;gap:4px;margin:0 0 6px 28px}
+.setting-row.sub{padding:7px 12px}
+@media (max-width:560px){.setting-row{grid-template-columns:auto 1fr}.setting-row .muted{grid-column:2}}
 .kind-tabs{margin:26px 0 0}
 .more{margin:8px 0 0;font-size:13px;color:var(--clay-ink)}
 .kinds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -279,6 +352,7 @@ dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
     <button data-view="inventory"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/></svg>Everything installed<span class="n" id="n-things"></span></button>
     <button data-view="guide"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4.5h5a2 2 0 0 1 2 2V16a1.5 1.5 0 0 0-1.5-1.5H4z"/><path d="M11 6.5a2 2 0 0 1 2-2h3v10h-5.5"/></svg>What's what</button>
     <button data-view="changes"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10a6 6 0 1 0 1.8-4.3M4 4v3h3"/></svg>Changes<span class="n" id="n-new"></span></button>
+    <button data-view="settings"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.8v2.1M10 15.1v2.1M2.8 10h2.1M15.1 10h2.1M4.9 4.9l1.5 1.5M13.6 13.6l1.5 1.5M4.9 15.1l1.5-1.5M13.6 6.4l1.5-1.5"/></svg>Settings</button>
   </nav>
   <div class="side-foot">
     <div id="scan-line"></div>
@@ -298,13 +372,24 @@ dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
 'use strict';
 const D=JSON.parse(document.getElementById('data').textContent);
 const $=id=>document.getElementById(id);
+if(D.onboarding){welcome(D.onboarding);return;}
+/** Counts before the agent filter, so Settings can show what each agent has on this Mac. */
+const FOUND=Object.fromEntries(['Claude','Codex','Cursor','Gemini'].map(a=>[a,D.things.filter(t=>t.agents.includes(a)).length]));
+const CHOSEN=D.settings?.agents?.length?new Set(D.settings.agents):null;
+if(CHOSEN){
+  const keep=as=>!as.length||as.some(a=>CHOSEN.has(a));
+  D.things=D.things.filter(t=>keep(t.agents)).map(t=>({...t,agents:t.agents.filter(a=>CHOSEN.has(a))}));
+  const kept=new Set(D.things.map(t=>t.id));
+  D.findings=D.findings.filter(f=>keep(f.agents)).map(f=>({...f,agents:f.agents.filter(a=>CHOSEN.has(a)),items:f.items.filter(id=>kept.has(id))}));
+  D.budgets=(D.budgets||[]).filter(b=>CHOSEN.has(b.agent));
+}
 const byId=new Map(D.things.map(t=>[t.id,t]));
 const projectsById=new Map(D.projects.map(p=>[p.id,p]));
 const AGENTS=['Claude','Codex','Cursor','Gemini'];
 const NEW_WINDOW_DAYS=14,DAY_MS=864e5,ROW_LIMIT=40;
 const KIND={rule:{one:'rule file',many:'rule files',title:'Rules'},skill:{one:'skill',many:'skills',title:'Skills'},command:{one:'command',many:'commands',title:'Commands'},subagent:{one:'subagent',many:'subagents',title:'Subagents'},hook:{one:'hook',many:'hooks',title:'Hooks'},mcp:{one:'MCP server',many:'MCP servers',title:'MCP servers'},'output-style':{one:'output style',many:'output styles',title:'Output styles'}};
 const KIND_ORDER=['skill','rule','command','subagent','hook','mcp'];
-const state={view:'overview',sev:'all',cat:'all',lensAgent:'Claude',lensProject:'',kind:'skill',invAgent:'all',invScope:'all',query:'',open:new Set(),expanded:new Set()};
+const state={view:'overview',sev:'all',cat:'all',addedRoots:[],expandedRoots:new Set(),lensAgent:'Claude',lensProject:'',kind:'skill',invAgent:'all',invScope:'all',query:'',open:new Set(),expanded:new Set()};
 const baseline=new Date(D.baselineAt),scanned=new Date(D.scannedAt);
 const isNew=t=>!!t.firstSeen&&new Date(t.firstSeen)>baseline&&scanned-new Date(t.firstSeen)<NEW_WINDOW_DAYS*DAY_MS;
 const DISMISS_KEY='rulebook-dismissed';
@@ -342,6 +427,7 @@ function categoryOf(f){
 }
 const findingsFor=id=>live().filter(f=>f.items.includes(id));
 const present=AGENTS.filter(a=>D.things.some(t=>t.agents.includes(a)));
+if(!present.includes(state.lensAgent)&&present.length)state.lensAgent=present[0];
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=p=>String(p).replace(/^\/Users\/[^/]+\//,'~/');
@@ -386,7 +472,7 @@ function navCounts(){
 }
 function render(){
   document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===state.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
-  $('page').innerHTML=({overview,lens,inventory,guide,changes})[state.view]();
+  $('page').innerHTML=({overview,lens,inventory,guide,changes,settings})[state.view]();
   if(state.view==='lens')requestAnimationFrame(drawKnots);
 }
 
@@ -395,7 +481,11 @@ const KIND_LABEL={'same-name':'Same name',overlap:'Overlap',contradiction:'Contr
 function overview(){
   const count=k=>D.things.filter(t=>t.kind===k).length;
   const high=live().filter(f=>f.severity==='high').length,medium=live().filter(f=>f.severity==='medium').length;
-  const lede=high?`${high} ${high===1?'clash needs':'clashes need'} a decision from you.`:medium?`Nothing clashes, but ${medium} ${medium===1?'thing is':'things are'} worth a look.`:'Nothing is clashing right now.';
+  const worth=medium?`${medium} ${medium===1?'thing is':'things are'} worth a look.`:'';
+  // Contradictions only come from the AI review, so before it runs "nothing clashes" would be a guess.
+  const unchecked=D.review.total-D.review.done;
+  const notChecked=!D.review.done?'Clashes are not checked until you run the AI review.':`${unchecked} ${unchecked===1?'place has':'places have'} not been checked for clashes yet.`;
+  const lede=high?`${high} ${high===1?'clash needs':'clashes need'} a decision from you.`:unchecked?`${worth?worth+' ':''}${notChecked}`:medium?`Nothing clashes, but ${worth.charAt(0).toLowerCase()+worth.slice(1)}`:'Nothing is clashing right now.';
   const lines=present.map(a=>{
     const mine=D.things.filter(t=>t.agents.includes(a));
     const parts=KIND_ORDER.map(k=>[k,mine.filter(t=>t.kind===k)]).filter(([,v])=>v.length).map(([k,v])=>{const g=v.filter(t=>t.global).length;return plural(v.length,k)+(k==='rule'||k==='skill'?` (${g} global)`:'');});
@@ -455,7 +545,7 @@ function lens(){
   return`<h1 class="lede">What ${esc(agent)} sees ${pid?'in '+esc(pname):'outside any project'}</h1>
   <p class="lede-sub">Follow the thread from the top: global first, then plugins, then the project. Numbered beads are rule files, loaded into every session in that order. Knots tie together files that clash.</p>
   <div class="lens-controls"><div class="seg" role="group" aria-label="Agent">${present.map(a=>`<button data-lens-agent="${a}" aria-pressed="${a===agent}">${a}</button>`).join('')}</div>
-  <label><span class="sr-only">Project</span><select class="pick" id="lens-project"><option value="">No project (global only)</option>${projectOpts.map(p=>`<option value="${esc(p.id)}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
+  <label><span class="sr-only">Project</span><select class="pick" id="lens-project"><option value="">No project (global only)</option>${projectOpts.map(p=>`<option value="${esc(p.id)}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>${pid&&API?`<button class="btn-quiet" data-ignore-folder="${esc(pid)}" title="Klosti will skip this folder. Bring it back under Changes.">Stop scanning this project</button>`:''}</div>
   ${thread}${emptyNote}${pickHint}
   ${band(`Available on demand <span class="count-inline">${skills.length}</span>`,`${esc(agent)} sees each name and description, and reads the full skill only when your request matches or you call it by name.`,(budget?skillMeter(budget,agent):'')+(skills.length?grouped(skills):'<p class="muted">No skills here.</p>'))}
   ${band('Runs automatically','Hooks are scripts, not instructions. They run on events such as editing a file or starting a session, whatever the model decides.',hooks.length?`<div class="rows">${hooks.map(row).join('')}</div>`:'<p class="muted">No hooks run here.</p>')}
@@ -652,7 +742,7 @@ function rulesFilesSection(){
   <div class="setup-row"><div><b>Only CLAUDE.md</b><div class="muted" style="font-size:13px">Codex and other agents get no project rules</div></div><div>${chips(onlyClaude)}</div></div>
   </div>`;
 }
-const ACTION_TEXT={'ai-fix':'Fixed with AI','delete-line':'Deleted a line',restore:'Restored from backup',trash:'Moved to the Trash','disable-plugin':'Disabled a plugin',resolve:'Marked as resolved',unresolve:'Put back on the list'};
+const ACTION_TEXT={'ai-fix':'Fixed with AI','delete-line':'Deleted a line',restore:'Restored from backup',trash:'Moved to the Trash','disable-plugin':'Disabled a plugin',resolve:'Marked as resolved',unresolve:'Put back on the list','ignore-folder':'Stopped scanning a folder','unignore-folder':'Scanning a folder again',settings:'Changed settings'};
 const FIX_WINDOW_MS=3*60*1000;
 const SIGN={added:'+',changed:'~',removed:'−'},VERB={added:'Added',changed:'Changed',removed:'Removed'};
 const whenLabel=iso=>new Date(iso).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -682,6 +772,121 @@ function historyList(){
   events.sort((a,b)=>b.at-a.at);
   if(!events.length)return`<div class="empty-state">Nothing yet. Tracking started ${dateLabel(D.baselineAt)}: your fixes, new installs and outside edits will show up here.</div>`;
   return`<ul class="fixes">${events.map((ev,i)=>ev.html(i===0)).join('')}</ul>`;
+}
+function ignoredSection(){
+  const ignored=D.ignored||[];
+  const rows=ignored.map(p=>`<div class="loc"><span class="path">${esc(short(p))}</span>${API?`<button class="btn-quiet" data-unignore-folder="${esc(p)}">Scan again</button>`:''}</div>`).join('');
+  const form=API?`<div class="toolbar"><button class="btn-quiet" data-ignore-input="1">Choose a folder to ignore…</button></div>`:`<p class="muted">Add folders to <code>"ignore"</code> in ~/.config/klosti/config.json.</p>`;
+  return`<h2 class="section">Folders you ignore</h2><p class="section-sub">Klosti skips these folders and everything inside them, so their rules, skills, hooks and MCP servers do not appear anywhere.</p>${rows||'<p class="muted">None yet.</p>'}${form}`;
+}
+/** Asks the local engine to open the system folder chooser. Resolves to null when the user cancels. */
+function chooseFolder(token){
+  return fetch('/api/pick-folder',{method:'POST',headers:{'Content-Type':'application/json','X-Klosti-Token':token},body:'{}'})
+    .then(r=>r.json().then(j=>{if(!r.ok)throw new Error(j.error||'The folder picker could not open.');return j.path||null;}))
+    .catch(err=>{throw err instanceof TypeError?new Error('Klosti is not running. Reopen the app.'):err;});
+}
+
+/** First run: pick agents and folders before anything is scanned. Self-contained, because the rest of the page needs scan data. */
+function welcome(ob){
+  const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  const tilde=p=>String(p).replace(/^\/Users\/[^/]+\//,'~/');
+  const opened=new Set();
+  const added=[];
+  let justOpened=null;
+  let entered=false;
+  const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.querySelector('.app').classList.add('is-welcome');
+  const choose=()=>chooseFolder((window.KLOSTI_API||{}).token);
+  const countUp=()=>document.querySelectorAll('.welcome [data-count]').forEach(el=>{
+    const target=Number(el.dataset.count),start=performance.now(),delay=900,duration=700;
+    el.textContent='0';
+    const tick=now=>{const t=Math.min(Math.max((now-start-delay)/duration,0),1);el.textContent=String(Math.round(target*(1-(1-t)**3)));if(t<1)requestAnimationFrame(tick);};
+    requestAnimationFrame(tick);
+  });
+  const shake=()=>{const w=document.querySelector('.welcome');if(!w||calm)return;w.classList.remove('is-shaking');void w.offsetWidth;w.classList.add('is-shaking');};
+  const draw=()=>{
+    const keep=new Map([...document.querySelectorAll('#page input[type=checkbox]')].map(i=>[`${i.name}|${i.value}`,i.checked]));
+    const checked=(key,fallback)=>keep.has(key)?keep.get(key):fallback;
+    const anyFound=ob.agents.some(a=>a.found);
+    const agents=ob.agents.map(a=>`<label class="agent-card${a.found?'':' is-missing'}" style="--c:var(--${a.name.toLowerCase()},var(--other))"><input type="checkbox" name="agent" value="${a.name}"${checked(`agent|${a.name}`,a.found||!anyFound)?' checked':''}><span class="agent-orb"><i></i></span><span class="agent-meta"><b>${a.name}</b><span class="muted">${a.found?'Found on this Mac':'Not found'}</span></span><span class="agent-tick" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5" pathLength="1"/></svg></span></label>`).join('');
+    const folders=[...ob.folders,...added.map(path=>({path,projects:[]}))].map(f=>{
+      const open=opened.has(f.path);
+      const rows=f.projects.map((p,i)=>`<label class="setting-row sub" style="--i:${i}"><input type="checkbox" name="project" value="${escape(p)}"${checked(`project|${p}`,true)?' checked':''}><span><b>${escape(p.split('/').pop())}</b></span><span></span></label>`).join('');
+      const toggle=f.projects.length?`<button class="btn-quiet" data-welcome-toggle="${escape(f.path)}" aria-expanded="${open}">${open?'Hide projects':'Show projects'}</button>`:'';
+      const count=f.projects.length?`<b class="count"${entered?'':` data-count="${f.projects.length}"`}>${f.projects.length}</b> ${f.projects.length===1?'project':'projects'} with agent files`:'No agent files at the top level';
+      return`<div class="root-block"><div class="setting-row root"><label><input type="checkbox" name="root" value="${escape(f.path)}"${checked(`root|${f.path}`,f.projects.length>0||added.includes(f.path))?' checked':''}><span class="path">${escape(tilde(f.path))}</span></label><span class="muted">${count}</span>${toggle}</div>${open?`<div class="sub-list${f.path===justOpened?' is-opening':''}">${rows}</div>`:''}</div>`;
+    }).join('');
+    const mark=`<svg class="welcome-mark" width="52" height="52" viewBox="0 0 64 64" aria-hidden="true"><mask id="welcome-cut"><rect width="64" height="64" fill="#fff"/><path d="M28 26.5C34 30 46 32 56 28" fill="none" stroke="#000" stroke-width="10.5" stroke-linecap="round"/></mask><g fill="none" stroke="var(--clay)" stroke-width="6.5" stroke-linecap="round"><path pathLength="1" d="M8 48C18 48 26 40 32 30C37 22 42 13 34 12C25 11 22 23 28 26.5" mask="url(#welcome-cut)"/><path class="tail" pathLength="1" d="M28 26.5C34 30 46 32 56 28"/></g></svg>`;
+    $('page').innerHTML=`<div class="welcome${entered?'':' enter'}">
+    <div class="welcome-hero">${mark}<span class="welcome-word">klosti</span><span class="welcome-run" aria-hidden="true"></span></div>
+    <div class="welcome-intro" style="--d:.25s"><h1 class="lede">Welcome to Klosti</h1>
+    <p class="lede-sub">Klosti follows the thread from each coding agent to every rule, skill, hook and MCP server it loads. Two questions first, then it scans. Nothing leaves your Mac.</p></div>
+    <section class="welcome-step" style="--d:.45s"><span class="welcome-bead" aria-hidden="true">1</span><h2 class="section">Which agents do you use?</h2><p class="section-sub">The others stay out of every list and out of the AI review. You can change this later in Settings.</p><div class="agent-pick">${agents}</div></section>
+    <section class="welcome-step" style="--d:.65s"><span class="welcome-bead" aria-hidden="true">2</span><h2 class="section">Where do you keep your code?</h2><p class="section-sub">Klosti looks for projects in these folders. Uncheck a project to skip it. Your agent settings folders (${escape(ob.agentRoots.map(tilde).join(', ')||'~/.claude and others')}) are always read, because global rules and skills live there.</p><div class="setting-list">${folders}</div>
+    <div class="toolbar"><button class="btn-quiet" data-welcome-pick="1">Choose another folder…</button></div></section>
+    <section class="welcome-step" style="--d:.85s"><span class="welcome-bead is-ring" aria-hidden="true"></span><div class="welcome-go"><button class="btn-primary btn-large" data-welcome-go="1">Scan and continue</button><span class="muted" id="welcome-error" role="alert"></span><span class="welcome-progress" aria-hidden="true"></span></div></section></div>`;
+    if(!entered&&!calm)countUp();
+    entered=true;
+    justOpened=null;
+  };
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+    if(d.welcomeToggle){
+      if(opened.has(d.welcomeToggle))opened.delete(d.welcomeToggle);else{opened.add(d.welcomeToggle);justOpened=d.welcomeToggle;}
+      draw();
+    }
+    else if(d.welcomePick){
+      b.disabled=true;
+      choose().then(path=>{if(path&&!added.includes(path)&&!ob.folders.some(f=>f.path===path))added.push(path);draw();}).catch(err=>{b.disabled=false;$('welcome-error').textContent=err.message;});
+    }
+    else if(d.welcomeGo){
+      const picked=name=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
+      const agents=picked('agent'),roots=picked('root');
+      const ignored=[...document.querySelectorAll('input[name="project"]:not(:checked)')].map(i=>i.value);
+      const page=document.querySelector('.welcome');
+      const fail=msg=>{$('welcome-error').textContent=msg;b.disabled=false;b.textContent='Scan and continue';page.classList.remove('is-scanning');shake();};
+      if(!agents.length)return fail('Pick at least one agent.');
+      if(!roots.length)return fail('Pick at least one folder.');
+      b.disabled=true;b.textContent='Following the thread…';$('welcome-error').textContent='';page.classList.add('is-scanning');
+      fetch('/api/onboard',{method:'POST',headers:{'Content-Type':'application/json','X-Klosti-Token':(window.KLOSTI_API||{}).token},body:JSON.stringify({agents,roots,ignored})})
+        .then(r=>r.json().then(j=>({ok:r.ok,j})))
+        .then(({ok,j})=>{if(!ok)throw new Error(j.error||'That did not work.');location.reload();})
+        .catch(err=>fail(err instanceof TypeError?'Klosti is not running. Reopen the app.':err.message));
+    }
+  });
+  draw();
+}
+
+let pendingChecks=null;
+/** Re-rendering Settings must not lose boxes the user changed but has not saved yet. */
+function rememberChecks(){pendingChecks=new Map([...document.querySelectorAll('.setting-list input[type=checkbox]')].map(i=>[`${i.name}|${i.value}`,i.checked]));}
+function restoreChecks(){if(!pendingChecks)return;document.querySelectorAll('.setting-list input[type=checkbox]').forEach(i=>{const k=`${i.name}|${i.value}`;if(pendingChecks.has(k))i.checked=pendingChecks.get(k);});}
+function settings(){
+  const st=D.settings||{agents:[],roots:D.roots,candidates:D.roots,agentRoots:[],configFile:''};
+  const chosen=st.agents.length?new Set(st.agents):new Set(AGENTS);
+  const roots=new Set(st.roots);
+  const folders=[...new Set([...st.candidates,...state.addedRoots])];
+  const dis=API?'':' disabled';
+  const agentRows=AGENTS.map(a=>`<label class="setting-row"><input type="checkbox" name="agent" value="${a}"${chosen.has(a)?' checked':''}${dis}><span>${agentDot(a)}</span><span class="muted">${FOUND[a]?`${FOUND[a]} items found on this Mac`:'Nothing found on this Mac'}</span></label>`).join('');
+  const ignored=new Set(D.ignored||[]);
+  const folderRows=folders.map(f=>{
+    const inside=p=>p.startsWith(f+'/');
+    const projects=[...new Set([...D.projects.map(p=>p.id),...ignored])].filter(inside).sort((a,b)=>a.localeCompare(b));
+    const open=state.expandedRoots.has(f);
+    const skipped=projects.filter(p=>ignored.has(p)).length;
+    const count=projects.length?`${projects.length-skipped} of ${projects.length} projects`:'No projects found yet';
+    const toggle=projects.length?`<button class="btn-quiet" data-toggle-root="${esc(f)}" aria-expanded="${open}">${open?'Hide projects':'Show projects'}</button>`:'';
+    const rows=projects.map(p=>{const rel=short(p).slice(short(f).length+1),name=projectsById.get(p)?.name||p.split('/').pop();return`<label class="setting-row sub"><input type="checkbox" name="project" value="${esc(p)}"${ignored.has(p)?'':' checked'}${dis}><span><b>${esc(name)}</b>${rel!==name?` <span class="path">${esc(rel)}</span>`:''}</span><span class="muted">${ignored.has(p)?'Ignored':''}</span></label>`;}).join('');
+    return`<div class="root-block"><div class="setting-row root"><label><input type="checkbox" name="root" value="${esc(f)}"${roots.has(f)||state.addedRoots.includes(f)?' checked':''}${dis}><span class="path">${esc(short(f))}</span></label><span class="muted">${count}</span>${toggle}</div>${open?`<div class="sub-list">${rows}</div>`:''}</div>`;
+  }).join('');
+  const add=API?`<div class="toolbar"><button class="btn-quiet" data-add-root="1">Choose another folder…</button></div>`:'';
+  const save=API?`<div class="finding-actions"><button class="btn-primary" data-save-settings="1">Save and scan again</button></div>`:`<p class="muted">To change these, open the app, or edit <code>${esc(short(st.configFile))}</code>.</p>`;
+  return`<h1 class="lede">Settings</h1><p class="lede-sub">Tell Klosti where you code and which agents you use. Everything else adapts: lists, filters, counts and the AI review leave the rest out.</p>
+  <h2 class="section">Agents you work with</h2><p class="section-sub">Unchecked agents disappear from every view, and the AI review skips them, so you do not pay for them.</p><div class="setting-list">${agentRows}</div>
+  <h2 class="section">Folders where you code</h2><p class="section-sub">Klosti looks for projects in these folders. Your agent settings folders (${esc(st.agentRoots.map(short).join(', ')||'~/.claude and others')}) are always scanned, because that is where global rules and skills live.</p><div class="setting-list">${folderRows}</div>${add}
+  ${save}
+  ${ignoredSection()}
+  <p class="muted" style="font-size:13px;margin-top:28px">Saved in <code>${esc(short(st.configFile))}</code>, shared with <code>npx klosti</code>.</p>`;
 }
 function changes(){
   return`<h1 class="lede">Changes</h1><p class="lede-sub">One timeline: what you fixed from this page, plus anything the scans noticed on their own, like a new skill or a rule file edited by hand. The watcher rescans when your skill or plugin folders change, and every 3 hours.</p>
@@ -717,6 +922,21 @@ document.addEventListener('click',e=>{
   if(d.view){go(d.view);}
   else if(d.sev){state.sev=d.sev;render();}
   else if(d.cat){state.cat=d.cat;render();}
+  else if(d.toggleRoot){const f=d.toggleRoot;rememberChecks();state.expandedRoots.has(f)?state.expandedRoots.delete(f):state.expandedRoots.add(f);render();restoreChecks();}
+  else if(d.addRoot){b.disabled=true;chooseFolder(API.token).then(path=>{b.disabled=false;if(!path)return;rememberChecks();if(!state.addedRoots.includes(path)&&!(D.settings?.candidates||[]).includes(path))state.addedRoots.push(path);render();restoreChecks();}).catch(err=>{b.disabled=false;showToast(err.message,null);});}
+  else if(d.saveSettings){
+    const picked=name=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
+    const agents=picked('agent'),roots=picked('root');
+    const shownProjects=[...document.querySelectorAll('input[name="project"]')].map(i=>i.value);
+    const unchecked=[...document.querySelectorAll('input[name="project"]:not(:checked)')].map(i=>i.value);
+    const ignored=[...(D.ignored||[]).filter(p=>!shownProjects.includes(p)),...unchecked];
+    if(!agents.length){showToast('Pick at least one agent.',null);return;}
+    if(!roots.length){showToast('Pick at least one folder.',null);return;}
+    b.disabled=true;b.textContent='Scanning…';callApi('/api/settings',{roots,agents,ignored});
+  }
+  else if(d.ignoreFolder){b.disabled=true;callApi('/api/ignore-folder',{path:d.ignoreFolder,ignore:true});}
+  else if(d.unignoreFolder){b.disabled=true;callApi('/api/ignore-folder',{path:d.unignoreFolder,ignore:false});}
+  else if(d.ignoreInput){b.disabled=true;chooseFolder(API.token).then(path=>{if(!path){b.disabled=false;return;}callApi('/api/ignore-folder',{path,ignore:true});}).catch(err=>{b.disabled=false;showToast(err.message,null);});}
   else if(d.delLine){previewLine(d.delLine,+d.quote,b);}
   else if(d.confirmLine){b.disabled=true;b.textContent='Deleting…';callApi('/api/rule-line',{finding:d.confirmLine,quote:+d.quote,expect:b.closest('.line-confirm').dataset.line});}
   else if(d.restoreBackups){confirmThen(b,()=>callApi('/api/undo',{backups:JSON.parse(d.restoreBackups)}));}
@@ -766,6 +986,7 @@ async function callApi(path,body){
     showToast(msg,null);
     document.querySelectorAll('.line-confirm').forEach(el=>el.remove());
     document.querySelectorAll('.btn-danger:disabled').forEach(b=>{b.disabled=false;b.classList.remove('confirming');b.textContent='Try again';});
+    document.querySelectorAll('[data-ignore-folder]:disabled,[data-unignore-folder]:disabled,[data-ignore-input]:disabled,[data-save-settings]:disabled').forEach(b=>{b.disabled=false;});
   }
 }
 async function proposeFix(findingId,button){
