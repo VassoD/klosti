@@ -60,11 +60,17 @@ function runProcess(command: string, args: string[], input: string, cwd: string,
 
 const CliReply = z.object({ is_error: z.boolean().optional(), result: z.unknown().optional(), structured_output: z.unknown().optional(), total_cost_usd: z.number().optional() });
 
+/** Claude Code rejects the draft 2020-12 $schema marker that Zod adds, so it is left out. */
+function cliSchema(schema: z.ZodType): Record<string, unknown> {
+  const { $schema: _marker, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;
+  return rest;
+}
+
 /** Headless Claude Code with no settings, plugins, hooks, MCP servers or tools, so only the prompt is in play. */
 async function askViaClaudeCode<T>(cli: string, prompt: string, schema: z.ZodType<T>): Promise<AiResult<T>> {
   const scratch = mkdtempSync(join(tmpdir(), 'klosti-'));
   try {
-    const args = ['-p', '--tools', '', '--disable-slash-commands', '--strict-mcp-config', '--no-session-persistence', '--setting-sources', '', '--model', AI_MODEL, '--output-format', 'json', '--json-schema', JSON.stringify(z.toJSONSchema(schema))];
+    const args = ['-p', '--tools', '', '--disable-slash-commands', '--strict-mcp-config', '--no-session-persistence', '--setting-sources', '', '--model', AI_MODEL, '--output-format', 'json', '--json-schema', JSON.stringify(cliSchema(schema))];
     const { code, stdout, stderr } = await runProcess(cli, args, prompt, scratch, CALL_TIMEOUT_MS);
     if (code !== 0) throw new AiResponseError((stderr || stdout).trim().slice(0, 300) || `Claude Code exited with ${code}`);
     const reply = CliReply.parse(JSON.parse(stdout));
