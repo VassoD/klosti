@@ -8,7 +8,7 @@ export function Install(): React.JSX.Element {
       <p className="kicker">Install</p>
       <h2>Pick up the thread</h2>
       <p className="install-lead">
-        klosti lives in your menu bar, keeps watch in the background, and lets you know when your agent setup changes.
+        Klosti lives in your menu bar, keeps watch in the background, and lets you know when your agent setup changes.
       </p>
       <DownloadButton />
       <p className="fine">{PLATFORM_NOTE}</p>

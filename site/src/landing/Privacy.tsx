@@ -7,7 +7,7 @@ const PROMISES = [
   },
   {
     title: "One data folder",
-    body: "Everything klosti keeps lives in one folder, never next to your code, along with a backup of every edit.",
+    body: "Everything Klosti keeps lives in one folder, never next to your code, along with a backup of every edit.",
   },
 ] as const;
 

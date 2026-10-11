@@ -9,6 +9,7 @@ See every rule, skill, hook and MCP server your coding agents (Claude Code, Code
 - `engine/`: the TypeScript engine and CLI (`npx klosti`). Scanner, analysis, AI review and fixes, local server. See [engine/README.md](engine/README.md).
 - `app/`: the macOS desktop app (Tauri). A menu bar app that runs the engine in the background, shows Klosti in a window, and sends a notification when your agent setup changes.
 - `src/template.html`: the interface, shared by the CLI and the app.
+- `brand/`: the shared brand. `tokens.css` is the single source for colors and fonts in the app and the site, synced with `node brand/sync.mjs`. See [brand/BRAND.md](brand/BRAND.md).
 - `site/`: the marketing site (Next.js, static export to `site/out`). `npm run dev` to work on it, `npm run build` to export. Set `NEXT_PUBLIC_MAC_DOWNLOAD_URL` to the .dmg once it is published; until then the install section shows the build-from-source steps.
 - `scripts/`: the original Python prototype, kept for reference. `install-watcher.py` installs a launchd job that runs the engine's scan with notifications, for use without the desktop app.
 

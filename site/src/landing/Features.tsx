@@ -3,7 +3,7 @@ import { ExampleFinding } from "@/landing/ExampleFinding";
 const FEATURES = [
   {
     title: "What each agent sees, per project",
-    body: "Pick an agent and a folder. klosti lists the rule files that load there in order, the skills the agent can reach for, the hooks that will run and the MCP servers it can call.",
+    body: "Pick an agent and a folder. Klosti lists the rule files that load there in order, the skills the agent can reach for, the hooks that will run and the MCP servers it can call.",
   },
   {
     title: "Clashes, ranked",
@@ -11,7 +11,7 @@ const FEATURES = [
   },
   {
     title: "Fixes you can undo",
-    body: "Accept a fix and klosti edits the file in place. Every edit is backed up first, and one click puts it back.",
+    body: "Accept a fix and Klosti edits the file in place. Every edit is backed up first, and one click puts it back.",
   },
   {
     title: "Notices when things change",

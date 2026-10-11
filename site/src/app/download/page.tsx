@@ -7,8 +7,8 @@ import { SiteFooter } from "@/landing/SiteFooter";
 import { SiteHeader } from "@/landing/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "Download klosti",
-  description: "Download klosti for Mac and install it in three steps.",
+  title: "Download Klosti",
+  description: "Download Klosti for Mac and install it in three steps.",
 };
 
 export default function DownloadPage(): React.JSX.Element {

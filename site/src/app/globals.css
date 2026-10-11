@@ -1,44 +1,8 @@
 /* Layout: one narrow reading column, broken once by a full-width labyrinth band the thread crosses.
-   Colors match the klosti app (src/template.html). */
+   Colors, fonts and radii come from brand/tokens.css through brand-tokens.css. */
 :root {
-  color-scheme: light;
-  --paper: #f6f4ef;
-  --paper-2: #efece5;
-  --card: #fffefb;
-  --ink: #22201c;
-  --ink-2: #4a463f;
-  --muted: #7a756b;
-  --line: #e3dfd5;
-  --line-2: #d0cabd;
-  --clay: #bd5b3b;
-  --clay-soft: #f6e6dd;
-  --clay-ink: #9a4426;
-  --high: #b2402c;
-  --ok: #3f7d5c;
-  --serif: var(--font-serif), "Iowan Old Style", Charter, Georgia, serif;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
   --measure: 40rem;
   --wide: 68rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --paper: #191816;
-    --paper-2: #201f1c;
-    --card: #252320;
-    --ink: #ece8e0;
-    --ink-2: #cbc5ba;
-    --muted: #9d978b;
-    --line: #353229;
-    --line-2: #4a463c;
-    --clay: #e08a68;
-    --clay-soft: #3a2a22;
-    --clay-ink: #f0a98b;
-    --high: #ec8a74;
-    --ok: #87c4a2;
-  }
 }
 
 * { box-sizing: border-box; }
