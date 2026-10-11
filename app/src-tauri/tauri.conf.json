@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Klosti",
+  "version": "0.1.0",
+  "identifier": "app.klosti.desktop",
+  "build": { "frontendDist": "../ui" },
+  "app": {
+    "windows": [
+      { "label": "main", "title": "Klosti", "width": 1280, "height": 860, "minWidth": 720, "minHeight": 520 }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "category": "DeveloperTool",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "externalBin": ["binaries/klosti-engine"],
+    "resources": { "../../engine/assets/template.html": "template.html" },
+    "macOS": { "minimumSystemVersion": "11.0" }
+  }
+}
