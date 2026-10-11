@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { AGENT_DIRS, HOME } from './config.ts';
 import { stripFrontmatter } from './scan.ts';
-import type { Agent, Analysis, FileRecord, Finding, ImportRef, Inventory, Judgements, ListingBudget, Location, ProjectRef, Quote, RuleStack, SkillContext, Thing } from './types.ts';
+import type { Agent, Analysis, FileRecord, Finding, ImportRef, InstructionStack, Inventory, Judgements, ListingBudget, Location, ProjectRef, Quote, RuleConflict, RuleStack, SkillContext, Thing } from './types.ts';
 
 const AGENTS: Agent[] = ['Claude', 'Codex', 'Cursor', 'Gemini'];
 const REVIEWED_AGENTS: Agent[] = ['Claude', 'Codex'];
@@ -353,6 +353,51 @@ function ruleStack(things: Thing[], projectId: string, agent: Agent): Thing[] {
     .sort((a, b) => Number(!a.global) - Number(!b.global) || (a.paths[0]?.length ?? 0) - (b.paths[0]?.length ?? 0));
 }
 
+function conflictFindings(conflicts: RuleConflict[], members: Thing[], together: Together, projectsById: Map<string, ProjectRef>, fallbackTitle: string, fallbackHappens: string): Finding[] {
+  return conflicts.filter(c => !c.resolved).map(conflict => {
+    const removed = new Map((conflict.removed ?? []).map(r => [r.text, r.backup]));
+    const quotes: Quote[] = (conflict.quotes ?? []).map(q => ({ ...q, removed: removed.has(q.text), backup: removed.get(q.text) ?? null }));
+    const files = new Set([...(conflict.files ?? []), ...quotes.map(q => q.file)]);
+    const involved = members.filter(t => (t.kind === 'rule' && files.has(basename(t.paths[0] ?? ''))) || t.paths.some(x => files.has(short(x)) || files.has(x))).map(t => t.id);
+    return finding('contradiction', 'high', conflict.title || fallbackTitle, conflict.explanation ?? '', conflict.happens || fallbackHappens, conflict.advice ?? '', involved.length ? involved : members.map(t => t.id), together, projectsById, { quotes, partlyFixed: quotes.some(q => q.removed), reviewed: true });
+  });
+}
+
+/** Skills that can bring their own instructions into a session. Built-in system skills are left out. */
+const instructionSkills = (things: Thing[], agent: Agent): Thing[] => things.filter(t => t.kind === 'skill' && t.agents.includes(agent) && t.source !== 'system' && !!t.body.trim());
+
+/**
+ * Every place where skills load next to rule files: everywhere (global only), plus each project with its own
+ * rules or skills. A project place only reports contradictions involving something of its own.
+ */
+function instructionStacks(things: Thing[], projects: ProjectRef[]): InstructionStack[] {
+  const out: InstructionStack[] = [];
+  for (const agent of REVIEWED_AGENTS) {
+    const skills = instructionSkills(things, agent);
+    const rules = things.filter(t => t.kind === 'rule' && t.agents.includes(agent) && !t.empty);
+    const candidates: [string | null, Thing[]][] = [[null, []], ...projects.map((p): [string, Thing[]] => [p.id, [...ruleStack(things, p.id, agent).filter(t => !t.global), ...skills.filter(t => !t.global && t.projects.some(x => x.id === p.id))]])];
+    for (const [pid, local] of candidates) {
+      if (pid && !local.length) continue;
+      const placeRules = pid ? ruleStack(things, pid, agent) : rules.filter(t => t.global);
+      const placeSkills = skills.filter(t => t.global || (!!pid && t.projects.some(x => x.id === pid)));
+      if (!placeSkills.length || placeRules.length + placeSkills.length < 2) continue;
+      const shas = sortedStrings([...placeRules, ...placeSkills].map(t => t.sha));
+      const focusShas = sortedStrings(local.map(t => t.sha));
+      out.push({ key: sha256Hex(`${agent}|${shas.join('|')}|focus|${focusShas.join('|')}`).slice(0, 16), agent, project: pid, rules: placeRules.map(t => t.id), skills: placeSkills.map(t => t.id), focus: local.map(t => t.id) });
+    }
+  }
+  return out;
+}
+
+function instructionFindings(things: Thing[], stacks: InstructionStack[], projectsById: Map<string, ProjectRef>, judgements: Judgements): Finding[] {
+  const byId = new Map(things.map(t => [t.id, t]));
+  return stacks.flatMap(stack => {
+    const members = [...stack.rules, ...stack.skills].flatMap(id => (byId.has(id) ? [byId.get(id)!] : []));
+    const together: Together = { agents: [stack.agent], where: stack.project ? 'projects' : 'everywhere', projects: stack.project ? [stack.project] : [] };
+    return conflictFindings(judgements.instructions[stack.key]?.conflicts ?? [], members, together, projectsById, 'A skill contradicts your instructions', `When ${stack.agent} uses the skill, both instructions are in the same session and it may follow either one.`);
+  });
+}
+
 function ruleFindings(things: Thing[], projects: ProjectRef[], projectsById: Map<string, ProjectRef>, judgements: Judgements): { findings: Finding[]; stacks: RuleStack[] } {
   const out: Finding[] = [];
   const stacks: RuleStack[] = [];
@@ -362,15 +407,8 @@ function ruleFindings(things: Thing[], projects: ProjectRef[], projectsById: Map
       if (stack.length < 2 || stack.every(t => t.global)) continue;
       const key = sha256Hex(sortedStrings(stack.map(t => t.sha)).join('|') + agent).slice(0, 16);
       stacks.push({ key, project: p.id, agent, rules: stack.map(t => t.id) });
-      for (const conflict of judgements.rules[key]?.conflicts ?? []) {
-        if (conflict.resolved) continue;
-        const removed = new Map((conflict.removed ?? []).map(r => [r.text, r.backup]));
-        const quotes: Quote[] = (conflict.quotes ?? []).map(q => ({ ...q, removed: removed.has(q.text), backup: removed.get(q.text) ?? null }));
-        const together: Together = { agents: [agent], where: 'projects', projects: [p.id] };
-        const files = conflict.files ?? [];
-        const involved = stack.filter(t => files.includes(basename(t.paths[0] ?? '')) || t.paths.some(x => files.includes(short(x)))).map(t => t.id);
-        out.push(finding('contradiction', 'high', conflict.title || 'Rules that contradict', conflict.explanation ?? '', conflict.happens || 'Both rules load into the same session. When instructions contradict, Claude may pick either one.', conflict.advice ?? '', involved.length ? involved : stack.map(t => t.id), together, projectsById, { quotes, partlyFixed: quotes.some(q => q.removed), reviewed: true }));
-      }
+      const together: Together = { agents: [agent], where: 'projects', projects: [p.id] };
+      out.push(...conflictFindings(judgements.rules[key]?.conflicts ?? [], stack, together, projectsById, 'Rules that contradict', 'Both rules load into the same session. When instructions contradict, Claude may pick either one.'));
     }
     const inProject = (t: Thing): boolean => t.projects.some(x => x.id === p.id);
     const claudeMd = things.filter(t => t.kind === 'rule' && t.family === 'Claude' && inProject(t) && !t.empty);
@@ -430,21 +468,23 @@ function mergeRepeated(findings: Finding[], projectsById: Map<string, ProjectRef
 export const projectRootsOf = (data: Inventory): string[] => data.roots.filter(r => !AGENT_DIRS.some(d => r === join(HOME, d)));
 
 export function analyze(data: Inventory, judgements: Partial<Judgements> = {}): Analysis {
-  const cache: Judgements = { skills: judgements.skills ?? {}, rules: judgements.rules ?? {} };
+  const cache: Judgements = { skills: judgements.skills ?? {}, rules: judgements.rules ?? {}, instructions: judgements.instructions ?? {}, digests: judgements.digests ?? {} };
   const { things, projects } = buildThings(data, projectRootsOf(data));
   const projectsById = new Map(projects.map(p => [p.id, p]));
   const contexts = skillContexts(things, projects);
   const rules = ruleFindings(things, projects, projectsById, cache);
   const listing = listingFindings(things, projects, projectsById);
+  const istacks = instructionStacks(things, projects);
   const findings = mergeRepeated([
     ...sameNameFindings(things, projectsById),
     ...reviewedFindings(things, contexts, projectsById, cache),
     ...similarFindings(things, contexts, projectsById, cache),
     ...mcpFindings(things, projectsById),
     ...rules.findings,
+    ...instructionFindings(things, istacks, projectsById, cache),
     ...listing.findings,
     ...hookFindings(things, projectsById),
   ], projectsById);
   findings.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9) || cmp(a.kind, b.kind) || cmp(a.title, b.title));
-  return { things, projects, findings, contexts, stacks: rules.stacks, budgets: listing.budgets };
+  return { things, projects, findings, contexts, stacks: rules.stacks, instructionStacks: istacks, budgets: listing.budgets };
 }

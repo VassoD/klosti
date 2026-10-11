@@ -15,12 +15,12 @@ export interface PagePayload extends Record<string, unknown> {
 export function payload(store: Store, analysis: Analysis): PagePayload {
   const inventory = store.inventory() as Inventory;
   const judgements = store.judgements();
-  const fresh = (group: 'skills' | 'rules', key: string): boolean => !!judgements[group][key] && !judgements[group][key]?.carriedOver;
-  const done = analysis.contexts.filter(c => fresh('skills', c.key)).length + analysis.stacks.filter(s => fresh('rules', s.key)).length;
-  const dates = [...Object.values(judgements.skills), ...Object.values(judgements.rules)].map(v => v.at).sort();
+  const fresh = (group: 'skills' | 'rules' | 'instructions', key: string): boolean => !!judgements[group][key] && !judgements[group][key]?.carriedOver;
+  const done = analysis.contexts.filter(c => fresh('skills', c.key)).length + analysis.stacks.filter(s => fresh('rules', s.key)).length + analysis.instructionStacks.filter(s => fresh('instructions', s.key)).length;
+  const dates = [...Object.values(judgements.skills), ...Object.values(judgements.rules), ...Object.values(judgements.instructions)].map(v => v.at).sort();
   return {
     things: analysis.things, projects: analysis.projects, findings: analysis.findings, budgets: analysis.budgets,
-    review: { done, total: analysis.contexts.length + analysis.stacks.length, lastAt: dates.at(-1) ?? null },
+    review: { done, total: analysis.contexts.length + analysis.stacks.length + analysis.instructionStacks.length, lastAt: dates.at(-1) ?? null },
     ai: aiAvailability(),
     history: inventory.history ?? [], actions: store.actions(), plugins: inventory.plugins ?? [], memories: inventory.memories ?? [],
     scannedAt: inventory.scannedAt, baselineAt: inventory.baselineAt ?? inventory.scannedAt, roots: inventory.roots ?? [], excluded: inventory.excluded ?? [], limits: inventory.limits ?? [], errors: inventory.errors ?? [],

@@ -12,6 +12,7 @@ import type { Store } from './store.ts';
 import type { Analysis, Finding, Inventory, Judgements, Quote, RuleConflict, Thing } from './types.ts';
 
 const REMOVABLE_KINDS = new Set(['skill', 'command', 'subagent']);
+const EDITABLE_KINDS = new Set(['rule', 'skill']);
 const PROTECTED_MARKERS = ['/plugins/', '/skills/synced/', '/skills/.system/', '/skills-cursor/', '/builtin/skills/'];
 const FUZZY_MATCH_RATIO = 0.82;
 const FIX_FILE_CHARS = 40000;
@@ -28,7 +29,8 @@ const expandHome = (p: string): string => (p.startsWith('~/') ? join(HOME, p.sli
 
 // ---- rule lines ---------------------------------------------------------------
 
-const normalize = (text: string): string => text.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').replace(/[`*_"“”']/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+/** Compares lines while ignoring bullets, quotes, emphasis, spacing and case. */
+export const normalize = (text: string): string => text.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').replace(/[`*_"“”']/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /** Similarity of two strings in [0, 1], like Python's difflib ratio on characters (2 * matches / total). */
 function ratio(a: string, b: string): number {
@@ -161,12 +163,16 @@ export function rescan(store: Store, config: ResolvedConfig, editConflict?: Conf
     const groups = old.groups.map(g => ({ ...g, ids: g.ids.flatMap(i => (idMap.has(i) ? [idMap.get(i)!] : [])) })).filter(g => g.ids.length >= 2);
     judgements.skills[ctx.key] = { ...old, groups, carriedOver: true };
   }
-  const oldStacks = new Map(before.stacks.map(s => [`${s.agent}\u0000${s.project}`, s.key]));
-  for (const stack of after.stacks) {
-    const old = judgements.rules[oldStacks.get(`${stack.agent}\u0000${stack.project}`) ?? ''];
-    if (judgements.rules[stack.key] || !old) continue;
-    judgements.rules[stack.key] = { ...old, conflicts: old.conflicts.map(c => (editConflict ? editConflict({ ...c }) : c)), carriedOver: true };
-  }
+  const carry = (group: Record<string, { conflicts: RuleConflict[]; at: string; model: string; carriedOver?: boolean }>, beforeStacks: { agent: string; project: string | null; key: string }[], afterStacks: { agent: string; project: string | null; key: string }[]): void => {
+    const oldKeys = new Map(beforeStacks.map(s => [`${s.agent}\u0000${s.project}`, s.key]));
+    for (const stack of afterStacks) {
+      const old = group[oldKeys.get(`${stack.agent}\u0000${stack.project}`) ?? ''];
+      if (group[stack.key] || !old) continue;
+      group[stack.key] = { ...old, conflicts: old.conflicts.map(c => (editConflict ? editConflict({ ...c }) : c)), carriedOver: true };
+    }
+  };
+  carry(judgements.rules, before.stacks, after.stacks);
+  carry(judgements.instructions, before.instructionStacks, after.instructionStacks);
   store.saveJudgements(judgements);
   return analyze(inventory, judgements);
 }
@@ -174,6 +180,7 @@ export function rescan(store: Store, config: ResolvedConfig, editConflict?: Conf
 function setResolved(store: Store, analysis: Analysis, title: string, resolved: boolean): void {
   const judgements: Judgements = store.judgements();
   for (const stack of analysis.stacks) for (const c of judgements.rules[stack.key]?.conflicts ?? []) if (c.title === title) c.resolved = resolved;
+  for (const stack of analysis.instructionStacks) for (const c of judgements.instructions[stack.key]?.conflicts ?? []) if (c.title === title) c.resolved = resolved;
   store.saveJudgements(judgements);
 }
 
@@ -207,12 +214,18 @@ export class Actions {
     return thing;
   }
 
+  /** A rule file or SKILL.md named in this issue that is safe to edit. Plugin and synced skills would be overwritten. */
   private rulePath(analysis: Analysis, finding: Finding, quoteFile: string): string {
     const path = expandHome(quoteFile);
-    const allowed = new Set(finding.items.flatMap(id => analysis.things.filter(t => t.id === id && t.kind === 'rule').flatMap(t => t.paths)));
-    if (!allowed.has(path)) throw new ActionRefused('That file is not one of the rule files in this issue.');
-    if (!isInside(path, HOME) || !existsSync(path)) throw new ActionRefused('Only rule files inside your home folder can be edited.');
+    const owner = analysis.things.find(t => finding.items.includes(t.id) && EDITABLE_KINDS.has(t.kind) && t.paths.includes(path));
+    if (!owner) throw new ActionRefused('That file is not one of the files in this issue.');
+    if (owner.kind === 'skill' && (owner.plugin || PROTECTED_MARKERS.some(m => posix(path).includes(m)))) throw new ActionRefused('This skill comes from a plugin or is synced, so an edit would be undone on the next update. Change the other side instead.');
+    if (!isInside(path, HOME) || !existsSync(path)) throw new ActionRefused('Only files inside your home folder can be edited.');
     return path;
+  }
+
+  private editablePath(analysis: Analysis, finding: Finding, file: string): string | null {
+    try { return this.rulePath(analysis, finding, file); } catch (error) { if (error instanceof ActionRefused) return null; throw error; }
   }
 
   deleteRuleLine(findingId: string, quoteIndex: number, options: { dryRun?: boolean; expect?: string }): ActionReply {
@@ -236,12 +249,13 @@ export class Actions {
     const analysis = this.current();
     const finding = this.finding(analysis, findingId);
     if (finding.kind !== 'contradiction') throw new ActionRefused('AI fixes are available for contradictions.');
-    const quoted = [...new Set((finding.quotes ?? []).filter(q => !q.removed).map(q => this.rulePath(analysis, finding, q.file)))].sort();
-    const paths = quoted.length ? quoted : [...new Set(finding.items.flatMap(id => analysis.things.filter(t => t.id === id && t.kind === 'rule').flatMap(t => t.paths)).filter(p => existsSync(p)))].sort();
-    if (!paths.length) throw new ActionRefused('No editable rule file found for this issue.');
+    const quoted = [...new Set((finding.quotes ?? []).filter(q => !q.removed).flatMap(q => this.editablePath(analysis, finding, q.file) ?? []))].sort();
+    const named = analysis.things.filter(t => finding.items.includes(t.id) && EDITABLE_KINDS.has(t.kind)).flatMap(t => t.paths).flatMap(p => this.editablePath(analysis, finding, short(p)) ?? []);
+    const paths = quoted.length ? quoted : [...new Set(named)].sort();
+    if (!paths.length) throw new ActionRefused('No file in this issue can be edited from here. Plugin skills are replaced on update.');
     const quotes = (finding.quotes ?? []).filter(q => !q.removed).map(q => `- ${q.file}: ${q.text}`).join('\n');
     const files = paths.map(p => `=== ${short(p)} ===\n${readFileSync(p, 'utf8').slice(0, FIX_FILE_CHARS)}`).join('\n\n');
-    const prompt = `Two instructions in these agent rule files contradict each other. Resolve the contradiction with the smallest possible edit.
+    const prompt = `Two instructions in these agent instruction files (rule files and skills) contradict each other. Only the files below may be edited. Resolve the contradiction with the smallest possible edit.
 
 Contradiction: ${finding.title}
 ${finding.summary}
@@ -292,7 +306,8 @@ Rules for your answer:
     if (resolved) name = this.finding(analysis, findingId ?? '').title;
     else {
       name = title ?? '';
-      const exists = Object.values(this.store.judgements().rules).some(v => v.conflicts.some(c => c.title === name && c.resolved));
+      const { rules, instructions } = this.store.judgements();
+      const exists = [...Object.values(rules), ...Object.values(instructions)].some(v => v.conflicts.some(c => c.title === name && c.resolved));
       if (!exists) throw new ActionRefused('Nothing to bring back.');
     }
     setResolved(this.store, analysis, name, resolved);
