@@ -134,21 +134,58 @@ button.chip:hover{border-color:var(--clay);color:var(--ink)}
 .empty-state{background:var(--card);border:1px dashed var(--line-2);border-radius:var(--radius-lg);padding:28px;text-align:center;color:var(--muted)}
 .lens-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:26px 0 22px}
 select.pick{appearance:none;background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237a756b' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line-2);border-radius:var(--radius);padding:8px 34px 8px 12px;font-size:14px;max-width:100%}
-.strata{display:grid;margin:0 0 30px}
-.stratum{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px 20px;border:1px solid var(--line-2);background:var(--card);border-radius:var(--radius-lg);margin-top:-6px}
-.stratum:first-child{margin-top:0}
-.stratum.l0{margin-inline:36px;background:var(--paper-2)}
-.stratum.l1{margin-inline:18px}
-.stratum.l2{background:var(--clay-soft);border-color:color-mix(in srgb,var(--clay) 35%,var(--line-2))}
-.stratum h3{font:600 16px/1.3 var(--serif);margin:0}
-.stratum p{margin:2px 0 0;font-size:13px;color:var(--muted)}
-.stratum .count{font:600 26px/1 var(--serif);font-variant-numeric:tabular-nums}
+.thread-wrap{margin:0 0 34px}
+.thread-legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 14px;font-size:12.5px;color:var(--muted)}
+.thread-legend span{display:inline-flex;align-items:center;gap:7px}
+.lg-bead{width:12px;height:12px;border-radius:50%;background:var(--clay)}
+.lg-ring{width:12px;height:12px;border-radius:50%;border:2px solid var(--clay);background:var(--card)}
+.lg-knot{width:16px;height:10px;border:2px solid var(--c);border-right:0;border-radius:10px 0 0 10px}
+.thread{position:relative;--thread-x:72px;--layer-gap:14px}
+.thread::before{content:"";position:absolute;left:calc(var(--thread-x) - 1.5px);top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--clay)}
+.layer{position:relative;padding:14px 18px 16px;border-radius:var(--radius-lg);margin-left:calc(var(--thread-x) + var(--layer-gap))}
+.layer::before{content:"";position:absolute;left:calc(-1 * var(--layer-gap));top:23px;width:var(--layer-gap);height:2px;background:var(--clay)}
+.layer+.layer{margin-top:8px}
+.layer.l-global{background:var(--paper-2)}
+.layer.l-plugin{background:color-mix(in srgb,var(--paper-2) 55%,var(--paper))}
+.layer.l-project{background:var(--clay-soft)}
+.layer.is-empty{background:none;border:1px dashed var(--line-2)}
+.layer-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.layer-head h3{font:600 16px/1.3 var(--serif);margin:0}
+.layer-head p{margin:0;font-size:13px;color:var(--muted)}
+.tally{margin-left:auto;font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.beads{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.bead{position:relative;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-height:22px}
+.bead::before{content:attr(data-n);position:absolute;left:calc(-1 * (var(--layer-gap) + 18px) - 11px);top:0;width:22px;height:22px;border-radius:50%;box-sizing:border-box;display:grid;place-items:center;font:600 11px/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--card);background:var(--clay);box-shadow:0 0 0 2px var(--paper)}
+.bead.is-demand::before{content:"";width:14px;height:14px;left:calc(-1 * (var(--layer-gap) + 18px) - 7px);top:4px;background:var(--card);border:2px solid var(--clay)}
+.bead .kindname{font-size:12px;color:var(--muted)}
+.bead .path{flex-basis:100%;font-size:12px}
+.layer-empty{margin:8px 0 0;font-size:13px;color:var(--muted)}
+.knots{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.knot{fill:none;stroke-width:2;stroke-linecap:round}
+.knot.high{stroke:var(--high)}.knot.medium{stroke:var(--medium)}.knot.low{stroke:var(--low)}
+.knot-dot{stroke:var(--paper);stroke-width:2}
+.knot-dot.high{fill:var(--high)}.knot-dot.medium{fill:var(--medium)}.knot-dot.low{fill:var(--low)}
+.knot-hit{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke;cursor:pointer}
+.knot-hit:focus{outline:none}
+.knot-group.is-hot .knot{stroke-width:3.5}
+.knots.has-hot .knot-group:not(.is-hot){opacity:.35}
+.knot-tip{position:absolute;z-index:2;max-width:300px;background:var(--ink);color:var(--paper);border-radius:var(--radius);padding:8px 12px;font-size:13px;line-height:1.4;pointer-events:none;box-shadow:0 6px 24px rgb(0 0 0 / .18)}
+.knot-tip b{display:block;font-weight:600}
+.knot-tip span{font-size:12px;opacity:.75}
+.meter{margin:0 0 18px;max-width:560px}
+.meter-track{position:relative;height:10px;border-radius:5px;background:var(--paper-2);box-shadow:inset 0 0 0 1px var(--line)}
+.meter-fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px 0 0 5px;background:var(--ink-2)}
+.meter-fill.is-whole{border-radius:5px}
+.meter-over{position:absolute;top:0;bottom:0;border-radius:0 5px 5px 0;background:var(--high);border-left:2px solid var(--paper)}
+.meter-limit{position:absolute;top:-5px;bottom:-5px;width:2px;margin-left:-1px;background:var(--ink);border-radius:1px}
+.meter-limit-label{position:absolute;bottom:calc(100% + 7px);transform:translateX(-50%);font-size:12px;color:var(--muted);white-space:nowrap}
+.meter{padding-top:22px}
+.meter-labels{display:flex;justify-content:space-between;gap:12px;margin-top:7px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meter-labels b{color:var(--ink);font-weight:600}
+.meter-labels .over{color:var(--high);font-weight:600}
 .band{display:grid;grid-template-columns:210px minmax(0,1fr);gap:28px;padding:26px 0;border-top:1px solid var(--line)}
 .band h3{font:600 17px/1.3 var(--serif);margin:0 0 6px}
 .band .why{font-size:13px;color:var(--muted);margin:0}
-.load-order{list-style:none;margin:0;padding:0;display:grid;gap:10px;counter-reset:step}
-.load-order li{counter-increment:step;display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:start}
-.load-order li::before{content:counter(step);font:600 13px/26px var(--serif);text-align:center;width:26px;height:26px;border-radius:50%;background:var(--paper-2);border:1px solid var(--line-2);color:var(--ink-2)}
 .group{margin:0 0 16px}
 .group-head{display:flex;align-items:baseline;gap:10px;margin:0 0 8px;font-size:13px;color:var(--muted)}
 .group-head b{color:var(--ink);font-weight:600;font-size:14px}
@@ -228,7 +265,7 @@ dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
 .markdown blockquote{margin:8px 0;padding-left:12px;border-left:2px solid var(--line-2)}
 .cmd{display:block;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--paper-2);padding:10px 12px;border-radius:var(--radius);font-family:var(--mono);font-size:12.5px}
 @media(max-width:960px){.page{padding:32px 28px 64px}.band{grid-template-columns:1fr;gap:12px}.kinds{grid-template-columns:1fr}}
-@media(max-width:760px){.app{display:block}.side{position:static;height:auto;gap:12px;padding:14px 16px}.side-foot,.nav .n,.nav-ico{display:none}.nav{display:flex;flex-wrap:wrap}.nav button{width:auto;padding:7px 10px;font-size:13px}.page{padding:26px 16px 56px}.row{grid-template-columns:1fr;gap:6px}.row .right{justify-content:flex-start}.explain{grid-template-columns:1fr}.agent-line{grid-template-columns:1fr;gap:4px}.stratum.l0{margin-inline:16px}.stratum.l1{margin-inline:8px}.history li{grid-template-columns:1fr;gap:4px}.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}
+@media(max-width:760px){.app{display:block}.side{position:static;height:auto;gap:12px;padding:14px 16px}.side-foot,.nav .n,.nav-ico{display:none}.nav{display:flex;flex-wrap:wrap}.nav button{width:auto;padding:7px 10px;font-size:13px}.page{padding:26px 16px 56px}.row{grid-template-columns:1fr;gap:6px}.row .right{justify-content:flex-start}.explain{grid-template-columns:1fr}.agent-line{grid-template-columns:1fr;gap:4px}.thread{--thread-x:40px;--layer-gap:10px}.layer{padding-inline:14px}.bead::before{left:-35px}.bead.is-demand::before{left:-31px}.layer::before{left:-10px}.history li{grid-template-columns:1fr;gap:4px}.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -338,6 +375,7 @@ function navCounts(){
 function render(){
   document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===state.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   $('page').innerHTML=({overview,lens,inventory,guide,changes})[state.view]();
+  if(state.view==='lens')requestAnimationFrame(drawKnots);
 }
 
 const SEV_LABEL={high:'Act on this',medium:'Worth checking',low:'For your information'};
@@ -388,30 +426,115 @@ function lens(){
   const here=D.things.filter(t=>visible(t,agent,pid));
   const isPlugin=t=>!!t.plugin;
   const own=here.filter(t=>t.global&&!isPlugin(t)),plugin=here.filter(t=>t.global&&isPlugin(t)),local=here.filter(t=>!t.global);
-  const strata=`<div class="strata" aria-label="Layers"><div class="stratum l0"><div><h3>Global</h3><p>Your own files, plus anything built in or synced, that apply everywhere</p></div><span class="count">${own.length}</span></div><div class="stratum l1"><div><h3>Plugins</h3><p>${esc([...new Set(plugin.map(t=>pluginName(t.plugin)))].join(', ')||'No plugins enabled')}</p></div><span class="count">${plugin.length}</span></div><div class="stratum l2"><div><h3>${pid?esc(pname):'No project'}</h3><p>${pid?'Only here, on top of the layers above':'Pick a project to add its own layer'}</p></div><span class="count">${local.length}</span></div></div>`;
   const rules=here.filter(t=>t.kind==='rule'&&!t.empty).sort((a,b)=>(a.global===b.global?a.paths[0].length-b.paths[0].length:a.global?-1:1));
   const emptyGlobals=here.filter(t=>t.kind==='rule'&&t.empty&&t.global);
   const emptyNote=emptyGlobals.map(t=>`<p class="muted" style="font-size:13px;margin:10px 0 0"><button class="chip" data-thing="${t.id}">${esc(short(t.paths[0]))}</button> exists but is empty, so ${esc(agent)} gets no global rules. Rules you add there apply in every project.</p>`).join('');
   const withRules=projectOpts.filter(p=>D.things.some(t=>t.kind==='rule'&&!t.empty&&t.agents.includes(agent)&&t.projects.some(x=>x.id===p.id)));
   const pickHint=!pid&&withRules.length?`<p class="muted" style="font-size:13px;margin:10px 0 0">Project rules load on top when ${esc(agent)} works inside a project. ${withRules.length} ${withRules.length===1?'project has':'projects have'} its own: ${withRules.slice(0,6).map(p=>`<button class="chip" data-lens-project="${esc(p.id)}">${esc(p.name)}</button>`).join(' ')}</p>`:'';
-  const ruleList=(rules.length?`<ol class="load-order">${rules.map(t=>`<li><div><button class="chip" data-thing="${t.id}">${esc(t.name)}</button> ${scopeChip(t)} ${t.loadsWhen==='nested'?'<span class="muted" style="font-size:12px">loads when working in that folder</span>':''}<div class="path">${esc(short(t.paths.find(p=>pid?p.startsWith(pid):true)||t.paths[0]))}</div></div></li>`).join('')}</ol>`:`<p class="muted">No rule files with content load here.</p>`)+emptyNote+pickHint;
   const grouped=items=>{const groups=new Map();items.forEach(t=>{const p=packOf(t);if(!groups.has(p.id))groups.set(p.id,{...p,items:[]});groups.get(p.id).items.push(t);});return[...groups.values()].sort((a,b)=>b.items.length-a.items.length).map(g=>`<div class="group"><div class="group-head"><b>${esc(g.name)}</b>${g.items.length}</div><div class="tiles">${g.items.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<button class="chip" data-thing="${t.id}" title="${esc(t.description)}">${esc(t.name)}${findingsFor(t.id).some(f=>f.severity!=='low')?' <span style="color:var(--high)">●</span>':''}</button>`).join('')}</div></div>`).join('');};
   const band=(title,why,body)=>`<section class="band"><div><h3>${title}</h3><p class="why">${why}</p></div><div>${body}</div></section>`;
   const skills=here.filter(t=>t.kind==='skill'||t.kind==='command');
   const hooks=here.filter(t=>t.kind==='hook'),mcp=here.filter(t=>t.kind==='mcp'),subs=here.filter(t=>t.kind==='subagent');
   const issues=live().filter(f=>f.agents.includes(agent)&&(f.where==='Everywhere'||(pid&&f.projectIds.includes(pid))));
   const budget=D.budgets.find(b=>b.agent===agent&&b.project===(pid||null));
+  const thread=threadView(here,rules,issues,pid,pname);
   return`<h1 class="lede">What ${esc(agent)} sees ${pid?'in '+esc(pname):'outside any project'}</h1>
-  <p class="lede-sub">Everything stacks: global first, then plugins, then the project. Pick an agent and a project to see exactly what loads. A red dot marks something with an issue.</p>
+  <p class="lede-sub">Follow the thread from the top: global first, then plugins, then the project. Numbered beads are rule files, loaded into every session in that order. Knots tie together files that clash.</p>
   <div class="lens-controls"><div class="seg" role="group" aria-label="Agent">${present.map(a=>`<button data-lens-agent="${a}" aria-pressed="${a===agent}">${a}</button>`).join('')}</div>
   <label><span class="sr-only">Project</span><select class="pick" id="lens-project"><option value="">No project (global only)</option>${projectOpts.map(p=>`<option value="${esc(p.id)}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
-  ${strata}
-  ${band('Always loaded','Rule files go into every session, in this order. Later files are more specific. When two contradict, the agent may follow either.',ruleList)}
-  ${band(`Available on demand <span class="count-inline">${skills.length}</span>`,`${esc(agent)} sees each name and description, and reads the full skill only when your request matches or you call it by name.`+(budget&&budget.chars>budget.limit?` Here the descriptions add up to about ${budget.chars.toLocaleString()} characters, so some may be dropped.`:''),skills.length?grouped(skills):'<p class="muted">No skills here.</p>')}
+  ${thread}${emptyNote}${pickHint}
+  ${band(`Available on demand <span class="count-inline">${skills.length}</span>`,`${esc(agent)} sees each name and description, and reads the full skill only when your request matches or you call it by name.`,(budget?skillMeter(budget,agent):'')+(skills.length?grouped(skills):'<p class="muted">No skills here.</p>'))}
   ${band('Runs automatically','Hooks are scripts, not instructions. They run on events such as editing a file or starting a session, whatever the model decides.',hooks.length?`<div class="rows">${hooks.map(row).join('')}</div>`:'<p class="muted">No hooks run here.</p>')}
   ${band('Connected tools','MCP servers give the agent extra tools and data.',mcp.length?`<div class="tiles">${mcp.map(t=>`<button class="chip" data-thing="${t.id}">${esc(t.name)} <span class="muted">${esc(t.mcpScope)}</span></button>`).join('')}</div>`:'<p class="muted">No MCP servers configured here. Account connectors from claude.ai are not stored on disk, so they are not listed.</p>')}
   ${subs.length?band('Helpers it can delegate to','Subagents work in their own context and report back.',`<div class="tiles">${subs.map(t=>`<button class="chip" data-thing="${t.id}" title="${esc(t.description)}">${esc(t.name)}</button>`).join('')}</div>`):''}
   ${band(`Issues here <span class="count-inline">${issues.length}</span>`,'Findings that affect this agent in this place.',issues.length?`<div class="findings">${issues.map(f=>findingCard(f)).join('')}</div>`:'<p class="muted">Nothing clashes here.</p>')}`;
+}
+
+const LAYERS=[{id:'global',name:'Global',note:'Your own files, plus anything built in or synced'},{id:'plugin',name:'Plugins',note:''},{id:'project',name:'',note:'Only here, on top of the layers above'}];
+function originLabel(t){
+  const kind=cap(KIND[t.kind].one);
+  if(t.source==='synced')return`${kind} synced from claude.ai`;
+  if(t.source==='system')return`${kind} built into ${t.agents[0]}`;
+  if(t.plugin||t.origin)return`${kind} from ${packOf(t).name}`;
+  return t.global?`Your own ${KIND[t.kind].one}`:`${kind} in this project`;
+}
+const layerOf=t=>!t.global?'project':t.plugin?'plugin':'global';
+function tally(items){
+  const n=k=>items.filter(t=>k.includes(t.kind)).length;
+  return[[n(['skill','command']),'skill'],[n(['hook']),'hook'],[n(['mcp']),'mcp'],[n(['subagent']),'subagent']].filter(([c])=>c).map(([c,k])=>plural(c,k)).join(' · ');
+}
+function threadView(here,rules,issues,pid,pname){
+  const flagged=new Set(issues.flatMap(f=>f.items));
+  let order=0;
+  const ruleN=new Map(rules.map(t=>[t.id,++order]));
+  const layers=LAYERS.map(l=>{
+    const items=here.filter(t=>layerOf(t)===l.id);
+    const name=l.id==='project'?(pid?pname:'No project'):l.name;
+    const note=l.id==='plugin'?([...new Set(items.map(t=>pluginName(t.plugin)))].join(', ')||'No plugins enabled'):l.id==='project'&&!pid?'Pick a project to add its own layer':l.note;
+    const beads=[...items.filter(t=>ruleN.has(t.id)).sort((a,b)=>ruleN.get(a.id)-ruleN.get(b.id)),...items.filter(t=>!ruleN.has(t.id)&&flagged.has(t.id)).sort((a,b)=>a.name.localeCompare(b.name))];
+    const list=beads.map(t=>{const isRule=ruleN.has(t.id);const path=short(t.paths.find(p=>pid?p.startsWith(pid):true)||t.paths[0]);return`<li class="bead${isRule?'':' is-demand'}" data-bead="${t.id}"${isRule?` data-n="${ruleN.get(t.id)}"`:''}><button class="chip" data-thing="${t.id}">${esc(t.name)}</button><span class="kindname">${isRule?(t.loadsWhen==='nested'?'rule file, loads when working in that folder':'rule file'):esc(originLabel(t))}</span>${isRule?`<span class="path">${esc(path)}</span>`:''}</li>`;}).join('');
+    const empty=!items.length&&(l.id!=='project'||!pid);
+    return`<section class="layer l-${l.id}${empty?' is-empty':''}"><div class="layer-head"><h3>${esc(name)}</h3><p>${esc(note)}</p>${items.length?`<span class="tally">${tally(items)}</span>`:''}</div>${list?`<ol class="beads">${list}</ol>`:items.length?'<p class="layer-empty">No rule files here, and nothing with an issue.</p>':''}</section>`;
+  }).join('');
+  const sevs=[...new Set(issues.map(f=>f.severity))];
+  const legend=`<div class="thread-legend" aria-hidden="true"><span><i class="lg-bead"></i>Rule file, always loaded, in this order</span><span><i class="lg-ring"></i>Loaded on demand, shown because it has an issue</span>${sevs.map(s=>`<span><i class="lg-knot" style="--c:var(--${s})"></i>Knot: ${SEV_LABEL[s].toLowerCase()}</span>`).join('')}</div>`;
+  return`<div class="thread-wrap">${legend}<div class="thread" id="thread">${layers}</div></div>`;
+}
+const KNOT_LANE_PX=11,KNOT_FIRST_LANE_PX=18,SELF_KNOT_PX=14,BEAD_EDGE_PX=8;
+function drawKnots(){
+  const host=$('thread');if(!host)return;
+  host.querySelector('.knots')?.remove();host.querySelector('.knot-tip')?.remove();
+  const agent=state.lensAgent,pid=state.lensProject;
+  const issues=live().filter(f=>f.agents.includes(agent)&&(f.where==='Everywhere'||(pid&&f.projectIds.includes(pid))));
+  const box=host.getBoundingClientRect();
+  const tx=parseFloat(getComputedStyle(host).getPropertyValue('--thread-x'));
+  const yOf=id=>{const el=host.querySelector(`[data-bead="${CSS.escape(id)}"]`);if(!el)return null;const r=el.getBoundingClientRect();return r.top-box.top+11;};
+  const spans=[];
+  for(const f of issues){
+    const ys=[...new Set(f.items.map(yOf).filter(y=>y!==null))].sort((a,b)=>a-b);
+    if(!ys.length)continue;
+    if(ys.length===1)spans.push({f,y1:ys[0],y2:ys[0]});
+    else for(let i=1;i<ys.length;i++)spans.push({f,y1:ys[i-1],y2:ys[i]});
+  }
+  spans.sort((a,b)=>(a.y2-a.y1)-(b.y2-b.y1));
+  const lanes=[];
+  for(const sp of spans){
+    let lane=0;while((lanes[lane]||[]).some(o=>!(sp.y2<o.y1-4||sp.y1>o.y2+4)))lane++;
+    (lanes[lane]=lanes[lane]||[]).push(sp);sp.lane=lane;
+  }
+  const NS='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(NS,'svg');svg.setAttribute('class','knots');svg.setAttribute('aria-hidden','true');
+  const tip=document.createElement('div');tip.className='knot-tip';tip.hidden=true;
+  const groups=new Map();
+  for(const sp of spans){
+    const ax=Math.max(4,tx-KNOT_FIRST_LANE_PX-sp.lane*KNOT_LANE_PX);
+    const d=sp.y1===sp.y2
+      ?`M${tx-BEAD_EDGE_PX+2},${sp.y1-5} C${tx-SELF_KNOT_PX*1.8},${sp.y1-13} ${tx-SELF_KNOT_PX*1.8},${sp.y1+13} ${tx-BEAD_EDGE_PX+2},${sp.y1+5}`
+      :`M${tx-BEAD_EDGE_PX},${sp.y1} C${tx-(tx-ax)*4/3},${sp.y1} ${tx-(tx-ax)*4/3},${sp.y2} ${tx-BEAD_EDGE_PX},${sp.y2}`;
+    const midX=sp.y1===sp.y2?tx-SELF_KNOT_PX*1.2:ax,midY=(sp.y1+sp.y2)/2;
+    let g=groups.get(sp.f.id);
+    if(!g){g=document.createElementNS(NS,'g');g.setAttribute('class','knot-group');groups.set(sp.f.id,g);svg.appendChild(g);}
+    g.insertAdjacentHTML('beforeend',`<path class="knot ${sp.f.severity}" d="${d}"/><circle class="knot-dot ${sp.f.severity}" cx="${midX}" cy="${midY}" r="4.5"/><path class="knot-hit" d="${d}" data-knot="${sp.f.id}" tabindex="0" role="button" aria-label="${esc(sp.f.title)}"/>`);
+  }
+  const show=(id,x,y)=>{const f=D.findings.find(x=>x.id===id);svg.classList.add('has-hot');groups.forEach((g,k)=>g.classList.toggle('is-hot',k===id));tip.innerHTML=`<b>${esc(f.title)}</b><span>${SEV_LABEL[f.severity]} · ${esc(KIND_LABEL[f.kind]||f.kind)} · click to open</span>`;tip.hidden=false;tip.style.left=`${Math.min(x+14,box.width-310)}px`;tip.style.top=`${y+12}px`;};
+  const hide=()=>{svg.classList.remove('has-hot');groups.forEach(g=>g.classList.remove('is-hot'));tip.hidden=true;};
+  const openFinding=id=>{state.open.add(id);render();document.querySelector(`.band [data-card="${CSS.escape(id)}"]`)?.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});};
+  svg.querySelectorAll('.knot-hit').forEach(p=>{
+    p.addEventListener('pointermove',e=>{const r=host.getBoundingClientRect();show(p.dataset.knot,e.clientX-r.left,e.clientY-r.top);});
+    p.addEventListener('pointerleave',hide);
+    p.addEventListener('focus',()=>{const b=p.getBBox();show(p.dataset.knot,b.x+b.width,b.y+b.height/2);});
+    p.addEventListener('blur',hide);
+    p.addEventListener('click',()=>openFinding(p.dataset.knot));
+    p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openFinding(p.dataset.knot);}});
+  });
+  host.append(svg,tip);
+}
+function skillMeter(b,agent){
+  const scale=Math.max(b.chars,b.limit)*1.04;
+  const pct=v=>`${(v/scale*100).toFixed(2)}%`;
+  const over=b.chars>b.limit;
+  const label=over?`${(b.chars/b.limit).toFixed(1)}× the limit, so some descriptions get dropped`:`${Math.round(b.chars/b.limit*100)}% of the limit`;
+  return`<div class="meter" role="img" aria-label="${esc(agent)} skill descriptions use about ${b.chars.toLocaleString()} of ${b.limit.toLocaleString()} characters. ${esc(label)}."><div class="meter-track"><span class="meter-fill${over?'':' is-whole'}" style="width:${pct(Math.min(b.chars,b.limit))}"></span>${over?`<span class="meter-over" style="left:${pct(b.limit)};width:calc(${pct(b.chars-b.limit)})"></span>`:''}<span class="meter-limit" style="left:${pct(b.limit)}"></span><span class="meter-limit-label" style="left:${pct(b.limit)}">Limit, about ${b.limit.toLocaleString()}</span></div><div class="meter-labels"><span><b>${b.chars.toLocaleString()}</b> characters of skill descriptions, ${b.count} skills</span><span class="${over?'over':''}">${esc(label)}</span></div></div>`;
 }
 
 function row(t){
@@ -662,6 +785,8 @@ const root=document.documentElement;
 try{const saved=localStorage.getItem('rulebook-theme');if(saved)root.dataset.theme=saved;}catch(e){}
 $('theme').addEventListener('click',()=>{const dark=root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;root.dataset.theme=dark?'light':'dark';try{localStorage.setItem('rulebook-theme',root.dataset.theme);}catch(e){}});
 const VIEWS=['overview','lens','inventory','guide','changes'];
+const KNOT_RESIZE_MS=120;let knotTimer=0;
+addEventListener('resize',()=>{clearTimeout(knotTimer);knotTimer=setTimeout(()=>{if(state.view==='lens')drawKnots();},KNOT_RESIZE_MS);});
 function go(view){state.view=view;if(location.hash.slice(1)!==view)history.replaceState(null,'','#'+view);render();window.scrollTo(0,0);}
 addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v)&&v!==state.view){state.view=v;render();}});
 const initial=location.hash.slice(1);if(VIEWS.includes(initial))state.view=initial;
