@@ -35,7 +35,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "build": "tsc -p tsconfig.json && node ../brand/sync.mjs --check && node scripts/copy-assets.mjs",
     "test": "npm run build && node --test \"dist/test/**/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm test"

@@ -12,7 +12,7 @@ export function AutoDownload({ url }: AutoDownloadProps): React.JSX.Element {
     <p className="dl-manual">
       Your download will begin automatically. If it didn&apos;t start,{" "}
       <a href={url} download>
-        download klosti manually
+        download Klosti manually
       </a>
       .
     </p>

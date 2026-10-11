@@ -22,7 +22,7 @@ export function Story(): React.JSX.Element {
           Together, it&apos;s hard to say which instruction wins.
         </p>
         <p>
-          klosti is the thread. It follows every file each agent loads, in the order it loads them, so you can find your
+          Klosti is the thread. It follows every file each agent loads, in the order it loads them, so you can find your
           way back out.
         </p>
       </div>
@@ -36,7 +36,7 @@ export function Story(): React.JSX.Element {
             </div>
           ))}
         </dl>
-        <p className="foot">klosti scans your code folders and every agent&apos;s settings folder, then puts it all on one page.</p>
+        <p className="foot">Klosti scans your code folders and every agent&apos;s settings folder, then puts it all on one page.</p>
       </aside>
     </section>
   );

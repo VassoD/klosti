@@ -5,15 +5,20 @@
 <title>Klosti</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23f6f4ef%22/%3E%3Cmask%20id%3D%22m%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%23fff%22/%3E%3Cpath%20d%3D%22M28%2026.5C34%2030%2046%2032%2056%2028%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%2211%22%20stroke-linecap%3D%22round%22/%3E%3C/mask%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23bd5b3b%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M8%2048C18%2048%2026%2040%2032%2030C37%2022%2042%2013%2034%2012C25%2011%2022%2023%2028%2026.5%22%20mask%3D%22url%28%23m%29%22/%3E%3Cpath%20d%3D%22M28%2026.5C34%2030%2046%2032%2056%2028%22/%3E%3C/g%3E%3C/svg%3E">
 <style>
+/* brand-tokens:start */
+/* klosti brand tokens. The single source for the app (src/template.html) and the site (site/).
+   Edit here, then run `node brand/sync.mjs`. Agent colors are validated with the dataviz
+   palette checker in this order (Claude, Codex, Cursor, Gemini) and always sit next to a name. */
 :root{color-scheme:light;
 --paper:#f6f4ef;--paper-2:#efece5;--card:#fffefb;--ink:#22201c;--ink-2:#4a463f;--muted:#7a756b;--line:#e3dfd5;--line-2:#d6d1c5;
 --clay:#bd5b3b;--clay-soft:#f6e6dd;--clay-ink:#9a4426;
---high:#b2402c;--medium:#a86a12;--low:#5f6f82;--low-soft:#e8ecf1;--ok:#3f7d5c;--ok-soft:#e3f0e8;
---claude:#bd5b3b;--codex:#2c6e5c;--cursor:#6a54a8;--gemini:#2f63b6;--other:#7a756b;
---serif:"Iowan Old Style","Charter","Source Serif 4",Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;--mono:ui-monospace,"SF Mono",Menlo,monospace;
+--high:#b2402c;--high-soft:#f7e4df;--medium:#a86a12;--medium-soft:#f6ecd9;--low:#5f6f82;--low-soft:#e8ecf1;--ok:#3f7d5c;--ok-soft:#e3f0e8;
+--claude:#eb6834;--codex:#1baf7a;--cursor:#eda100;--gemini:#2a78d6;--other:#7a756b;
+--serif:"Iowan Old Style",var(--font-serif-web,Charter),Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono",var(--font-mono-web,Menlo),monospace;
 --radius-lg:14px;--radius:9px;--radius-sm:6px}
-:root[data-theme=dark]{color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--medium:#e0b062;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#e08a68;--codex:#7cc8b0;--cursor:#b9a6f2;--gemini:#8fb4f2}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--medium:#e0b062;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#e08a68;--codex:#7cc8b0;--cursor:#b9a6f2;--gemini:#8fb4f2}}
+:root[data-theme=dark]{color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5}}
+/* brand-tokens:end */
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 var(--sans)}

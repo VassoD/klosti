@@ -12,7 +12,7 @@ export function Hero(): React.JSX.Element {
       </h1>
       <p className="lead">
         Claude Code, Codex, Cursor and Gemini each read their own rules, skills, hooks and MCP servers, from folders all
-        over your Mac. klosti maps all of it, shows what each agent sees in each project, and tells you where your
+        over your Mac. Klosti maps all of it, shows what each agent sees in each project, and tells you where your
         instructions contradict each other.
       </p>
       <div className="ctas">
