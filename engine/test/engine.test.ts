@@ -36,7 +36,7 @@ describe('redact', () => {
 
 describe('locateLine', () => {
   let dir: string;
-  before(() => { dir = mkdtempSync(join(tmpdir(), 'rulebook-lines-')); });
+  before(() => { dir = mkdtempSync(join(tmpdir(), 'klosti-lines-')); });
   after(() => rmSync(dir, { recursive: true, force: true }));
 
   it('should find a line despite markdown and punctuation differences', () => {
@@ -60,7 +60,7 @@ describe('locateLine', () => {
 
 describe('backups', () => {
   it('should restore a file byte for byte', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'rulebook-backup-'));
+    const dir = mkdtempSync(join(tmpdir(), 'klosti-backup-'));
     try {
       const store = new Store(join(dir, 'data'));
       const file = join(dir, 'CLAUDE.md');
@@ -79,7 +79,7 @@ describe('scan and analyze a fixture workspace', () => {
   let inventory: Inventory;
 
   before(() => {
-    root = mkdtempSync(join(tmpdir(), 'rulebook-fixture-'));
+    root = mkdtempSync(join(tmpdir(), 'klosti-fixture-'));
     const app = join(root, 'app');
     mkdirSync(join(app, '.git'), { recursive: true });
     write(join(app, 'CLAUDE.md'), '# App rules\n- Use pnpm\n');

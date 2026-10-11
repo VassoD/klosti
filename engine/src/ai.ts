@@ -7,8 +7,8 @@ import { delimiter, join } from 'node:path';
 import { z } from 'zod';
 import { HOME } from './config.ts';
 
-/** Override with AGENT_RULEBOOK_MODEL, for example claude-sonnet-5-5 for lower cost. */
-export const AI_MODEL = process.env.AGENT_RULEBOOK_MODEL ?? 'claude-opus-5-5';
+/** Override with KLOSTI_MODEL, for example claude-sonnet-5-5 for lower cost. */
+export const AI_MODEL = process.env.KLOSTI_MODEL ?? process.env.AGENT_RULEBOOK_MODEL ?? 'claude-opus-5-5';
 const MAX_TOKENS = 16000;
 const CALL_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
@@ -62,7 +62,7 @@ const CliReply = z.object({ is_error: z.boolean().optional(), result: z.unknown(
 
 /** Headless Claude Code with no settings, plugins, hooks, MCP servers or tools, so only the prompt is in play. */
 async function askViaClaudeCode<T>(cli: string, prompt: string, schema: z.ZodType<T>): Promise<AiResult<T>> {
-  const scratch = mkdtempSync(join(tmpdir(), 'agent-rulebook-'));
+  const scratch = mkdtempSync(join(tmpdir(), 'klosti-'));
   try {
     const args = ['-p', '--tools', '', '--disable-slash-commands', '--strict-mcp-config', '--no-session-persistence', '--setting-sources', '', '--model', AI_MODEL, '--output-format', 'json', '--json-schema', JSON.stringify(z.toJSONSchema(schema))];
     const { code, stdout, stderr } = await runProcess(cli, args, prompt, scratch, CALL_TIMEOUT_MS);

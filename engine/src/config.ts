@@ -12,7 +12,18 @@ export const DEFAULT_CODE_DIRS = ['side-projects', 'projets', 'projects', 'Proje
 
 export const EXCLUDED_DIRS = ['node_modules', '.git', 'vendor', '.venv', 'plugins', 'worktrees', 'cache', 'sessions', 'history', 'extensions', '.next', 'build', '.trash', 'vendor_imports', '.tmp', 'Library', '.Trash'];
 
-const CONFIG_FILE = join(HOME, '.config', 'agent-rulebook', 'config.json');
+const APP_SLUG = 'klosti';
+/** The name before the Klosti rebrand. Existing folders under it keep working. */
+const LEGACY_SLUG = 'agent-rulebook';
+
+/** The Klosti folder in `parent`, or the pre-rebrand one when only that exists. */
+function brandDir(parent: string): string {
+  const current = join(parent, APP_SLUG);
+  const legacy = join(parent, LEGACY_SLUG);
+  return !existsSync(current) && existsSync(legacy) ? legacy : current;
+}
+
+const CONFIG_FILE = join(brandDir(join(HOME, '.config')), 'config.json');
 
 export interface UserConfig {
   /** Extra folders to scan for projects, absolute or relative to the home folder. */
@@ -48,10 +59,11 @@ export interface ResolvedConfig {
 }
 
 function defaultDataDir(): string {
-  if (process.env.AGENT_RULEBOOK_DATA) return process.env.AGENT_RULEBOOK_DATA;
-  if (platform() === 'darwin') return join(HOME, 'Library', 'Application Support', 'agent-rulebook');
-  if (platform() === 'win32') return join(process.env.APPDATA ?? join(HOME, 'AppData', 'Roaming'), 'agent-rulebook');
-  return join(process.env.XDG_DATA_HOME ?? join(HOME, '.local', 'share'), 'agent-rulebook');
+  const fromEnv = process.env.KLOSTI_DATA ?? process.env.AGENT_RULEBOOK_DATA;
+  if (fromEnv) return fromEnv;
+  if (platform() === 'darwin') return brandDir(join(HOME, 'Library', 'Application Support'));
+  if (platform() === 'win32') return brandDir(process.env.APPDATA ?? join(HOME, 'AppData', 'Roaming'));
+  return brandDir(process.env.XDG_DATA_HOME ?? join(HOME, '.local', 'share'));
 }
 
 export function resolveConfig(overrides: { roots?: string[]; dataDir?: string } = {}): ResolvedConfig {

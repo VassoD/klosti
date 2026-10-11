@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serve the Rulebook on localhost so the page can fix things: delete a contradicting rule line,
+"""Serve Klosti on localhost so the page can fix things: delete a contradicting rule line,
 move a skill to the Trash, or disable a plugin.
 
 Only listens on 127.0.0.1, requires a per-run token, and only acts on items found by the last scan.
@@ -266,7 +266,7 @@ def set_resolved(title, resolved):
 # ---- HTTP -------------------------------------------------------------------
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = 'Rulebook'
+    server_version = 'Klosti'
 
     def allowed_host(self):
         return self.headers.get('Host', '') in (f'127.0.0.1:{self.server.server_port}', f'localhost:{self.server.server_port}')
@@ -283,11 +283,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.allowed_host(): return self.send(403, {'error':'Forbidden host'})
         if self.path.split('?')[0] not in ('/', '/index.html'): return self.send(404, {'error':'Not found'})
-        api = f'<script>window.RULEBOOK_API={json.dumps({"token":TOKEN})};</script>'
+        api = f'<script>window.KLOSTI_API={json.dumps({"token":TOKEN})};</script>'
         self.send(200, INDEX.read_text().replace('</head>', api + '</head>', 1).encode(), 'text/html; charset=utf-8')
 
     def do_POST(self):
-        if not self.allowed_host() or self.headers.get('X-Rulebook-Token') != TOKEN: return self.send(403, {'error':'This page is out of date. Reload it.'})
+        if not self.allowed_host() or self.headers.get('X-Klosti-Token') != TOKEN: return self.send(403, {'error':'This page is out of date. Reload it.'})
         length = int(self.headers.get('Content-Length', 0))
         if length > MAX_BODY_BYTES: return self.send(413, {'error':'Request too large'})
         try:
@@ -360,7 +360,7 @@ def main():
     args = parser.parse_args()
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     url = f'http://127.0.0.1:{args.port}/'
-    print(f'Rulebook running at {url}  (Ctrl+C to stop)')
+    print(f'Klosti running at {url}  (Ctrl+C to stop)')
     if not args.no_open: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: print('\nStopped.')

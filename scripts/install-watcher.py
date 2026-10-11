@@ -9,9 +9,11 @@ import sys
 
 BASE = Path(__file__).resolve().parents[1]
 HOME = Path.home()
-LABEL = 'local.agent-rulebook.refresh'
+LABEL = 'local.klosti.refresh'
+# The label before the Klosti rebrand, removed on install and uninstall so only one watcher runs.
+LEGACY_LABEL = 'local.agent-rulebook.refresh'
 PLIST = HOME / 'Library/LaunchAgents' / f'{LABEL}.plist'
-LOG = HOME / 'Library/Logs/agent-rulebook.log'
+LOG = HOME / 'Library/Logs/klosti.log'
 # Folders where installs land. launchd fires when their direct entries change.
 WATCHED = ['.claude/skills', '.claude/plugins', '.codex/skills', '.codex/config.toml', '.agents/skills', '.cursor/skills-cursor']
 # Project skills live deep in repos, which launchd cannot watch recursively, so a periodic scan catches them.
@@ -22,10 +24,16 @@ NODE = shutil.which('node') or str(HOME / '.local/bin/node')
 def launchctl(*args):
     return subprocess.run(['launchctl', *args], capture_output=True, text=True)
 
+def remove(label):
+    launchctl('bootout', f'gui/{os.getuid()}/{label}')
+    plist = PLIST.with_name(f'{label}.plist')
+    if plist.exists():
+        plist.unlink()
+        print(f'Removed {plist}')
+
 def uninstall():
-    launchctl('bootout', f'gui/{os.getuid()}/{LABEL}')
-    PLIST.unlink(missing_ok=True)
-    print(f'Removed {PLIST}')
+    remove(LABEL)
+    remove(LEGACY_LABEL)
 
 def install():
     watched = [str(HOME / p) for p in WATCHED if (HOME / p).exists()]
@@ -43,6 +51,7 @@ def install():
         'StandardErrorPath': str(LOG),
     }
     PLIST.parent.mkdir(parents=True, exist_ok=True)
+    remove(LEGACY_LABEL)
     launchctl('bootout', f'gui/{os.getuid()}/{LABEL}')
     PLIST.write_bytes(plistlib.dumps(config))
     result = launchctl('bootstrap', f'gui/{os.getuid()}', str(PLIST))
