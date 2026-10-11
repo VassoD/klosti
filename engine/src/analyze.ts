@@ -215,7 +215,7 @@ function finding(kind: Finding['kind'], severity: Finding['severity'], title: st
 
 function label(t: Thing): string {
   if (t.global) {
-    if (t.source === 'plugin') return `plugin ${(t.plugin ?? '').split('@')[0]}`;
+    if (t.plugin || t.source === 'plugin') return `${(t.plugin ?? '').split('@')[0]} plugin`;
     if (t.source === 'synced') return 'synced from claude.ai';
     if (t.source === 'system') return 'built into the app';
     return 'global';
@@ -446,7 +446,7 @@ function listingFindings(things: Thing[], projects: ProjectRef[], projectsById: 
 function hookFindings(things: Thing[], projectsById: Map<string, ProjectRef>): Finding[] {
   return things.filter(t => t.kind === 'hook' && INJECTING_EVENTS.has(t.event ?? '') && (t.command ?? '').toLowerCase().includes('inject')).map(t => {
     const together: Together = { agents: t.agents, where: t.global ? 'everywhere' : 'projects', projects: t.projects.map(p => p.id) };
-    return finding('hidden', 'medium', 'A hook adds instructions to every session', `${capitalize(label(t))} runs a ${t.event} hook that injects text into the conversation.`, 'These instructions never appear in any CLAUDE.md, so they are easy to forget. They load everywhere the hook applies.', 'Open the hook to see what it adds. Disable the plugin if you do not want it.', [t.id], together, projectsById);
+    return finding('hidden', 'medium', 'A hook adds instructions to every session', `${t.plugin ? `The ${t.plugin.split('@')[0]} plugin` : capitalize(label(t))} runs a ${t.event} hook that injects text into the conversation.`, 'These instructions never appear in any CLAUDE.md, so they are easy to forget. They load everywhere the hook applies.', 'Open the hook to see what it adds. Disable the plugin if you do not want it.', [t.id], together, projectsById);
   });
 }
 

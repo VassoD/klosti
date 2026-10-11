@@ -135,6 +135,7 @@ export interface Inventory {
   extrasTracked: boolean;
   roots: string[];
   excluded: string[];
+  ignored?: string[];
   errors: string[];
   files: FileRecord[];
   extras: Extras;

@@ -144,7 +144,8 @@ export interface ReviewPlan { pending: string[]; jobs: Job[]; inputChars: number
 const entry = <T extends object>(value: T): T & { at: string; model: string } => ({ ...value, at: nowIso(), model: AI_MODEL });
 
 /** What still needs an AI review: places never reviewed, or carried over after a change made from the app. */
-export function planReview(analysis: Analysis, store: Store, force = false): ReviewPlan {
+export function planReview(analysis: Analysis, store: Store, force = false, agents: string[] = []): ReviewPlan {
+  const wanted = (agent: string): boolean => !agents.length || agents.includes(agent);
   const cache = store.judgements();
   const byId = new Map(analysis.things.map(t => [t.id, t]));
   const projects = new Map(analysis.projects.map(p => [p.id, p]));
@@ -157,7 +158,7 @@ export function planReview(analysis: Analysis, store: Store, force = false): Rev
     planned.add(key);
     return force || !cached || !!cached.carriedOver;
   };
-  for (const ctx of analysis.contexts) {
+  for (const ctx of analysis.contexts.filter(c => wanted(c.agent))) {
     if (!stale(cache.skills[ctx.key], `skills:${ctx.key}`)) continue;
     const prompt = skillPrompt(ctx, byId, projects);
     jobs.push({ label: label('skills', ctx.agent, ctx.project), phase: 2, inputChars: prompt.length, run: async () => {
@@ -165,7 +166,7 @@ export function planReview(analysis: Analysis, store: Store, force = false): Rev
       return { costUsd, save: c => { c.skills[ctx.key] = entry(value); } };
     } });
   }
-  for (const stack of analysis.stacks) {
+  for (const stack of analysis.stacks.filter(s => wanted(s.agent))) {
     if (!stale(cache.rules[stack.key], `rules:${stack.key}`)) continue;
     const prompt = rulePrompt(stack, byId, projects);
     jobs.push({ label: label('rules', stack.agent, stack.project), phase: 2, inputChars: prompt.length, run: async () => {
@@ -174,7 +175,7 @@ export function planReview(analysis: Analysis, store: Store, force = false): Rev
     } });
   }
 
-  const istacks = analysis.instructionStacks.filter(s => stale(cache.instructions[s.key], `instructions:${s.key}`));
+  const istacks = analysis.instructionStacks.filter(s => wanted(s.agent) && stale(cache.instructions[s.key], `instructions:${s.key}`));
   const needed = new Map<string, Thing>();
   for (const s of istacks) for (const id of s.skills) { const t = byId.get(id)!; if (force || !cache.digests[t.sha]) needed.set(t.sha, t); }
   const batches: Thing[][] = [];
