@@ -258,6 +258,10 @@ export interface RuleConflict {
 export interface Judgements {
   skills: Record<string, { groups: SkillGroup[]; at: string; model: string; carriedOver?: boolean }>;
   rules: Record<string, { conflicts: RuleConflict[]; at: string; model: string; carriedOver?: boolean }>;
+  /** Contradictions that involve at least one skill, keyed by InstructionStack key. */
+  instructions: Record<string, { conflicts: RuleConflict[]; at: string; model: string; carriedOver?: boolean }>;
+  /** The behaviour instructions in each skill, quoted verbatim, keyed by the skill's content sha. */
+  digests: Record<string, { instructions: string[]; at: string; model: string }>;
 }
 
 export interface SkillContext {
@@ -275,6 +279,17 @@ export interface RuleStack {
   rules: string[];
 }
 
+/** A place where skills load next to rule files, checked for contradictions that involve a skill. */
+export interface InstructionStack {
+  key: string;
+  agent: Agent;
+  project: string | null;
+  rules: string[];
+  skills: string[];
+  /** Items that only load in this project. Empty for the global place. */
+  focus: string[];
+}
+
 export interface ListingBudget {
   agent: Agent;
   project: string | null;
@@ -289,6 +304,7 @@ export interface Analysis {
   findings: Finding[];
   contexts: SkillContext[];
   stacks: RuleStack[];
+  instructionStacks: InstructionStack[];
   budgets: ListingBudget[];
 }
 

@@ -35,6 +35,7 @@ Options
   -h, --help      Show this help`;
 
 const NOTIFY_NAME_LIMIT = 3;
+const CHARS_PER_TOKEN = 4;
 
 /** macOS only for now; the desktop app will handle notifications natively. */
 function notify(changes: { added: { name: string }[]; changed: { name: string }[]; removed: { name: string }[] }): void {
@@ -95,7 +96,7 @@ async function main(): Promise<void> {
     case 'review': {
       if (!store.inventory().files) doScan();
       const plan = planReview(analyze(store.inventory() as Inventory, store.judgements()), store, values.force ?? false);
-      if (values['dry-run'] || !plan.jobs.length) { console.log(plan.jobs.length ? `Would review ${plan.jobs.length} places:\n  ${plan.pending.join('\n  ')}` : 'Everything is already reviewed.'); return; }
+      if (values['dry-run'] || !plan.jobs.length) { console.log(plan.jobs.length ? `Would make ${plan.jobs.length} calls, about ${Math.round(plan.inputChars / CHARS_PER_TOKEN).toLocaleString('en-US')} input tokens:\n  ${plan.pending.join('\n  ')}` : 'Everything is already reviewed.'); return; }
       console.log(`Reviewing ${plan.jobs.length} places with Claude...`);
       const result = await runReview(plan, store, (done, total) => process.stdout.write(`\r  ${done}/${total}`));
       console.log(`\nReviewed ${result.reviewed}.${result.costUsd ? ` About $${result.costUsd.toFixed(2)} at list price.` : ''}`);

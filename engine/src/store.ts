@@ -37,7 +37,7 @@ export class Store {
 
   judgements(): Judgements {
     const cache = this.read<Partial<Judgements>>(this.judgementsFile, {});
-    return { skills: cache.skills ?? {}, rules: cache.rules ?? {} };
+    return { skills: cache.skills ?? {}, rules: cache.rules ?? {}, instructions: cache.instructions ?? {}, digests: cache.digests ?? {} };
   }
   saveJudgements(judgements: Judgements): void { this.write(this.judgementsFile, judgements); }
 

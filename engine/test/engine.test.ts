@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { ActionRefused, backUp, locateLine, restore } from '../src/actions.ts';
 import { analyze } from '../src/analyze.ts';
+import { verbatim } from '../src/review.ts';
 import { EXCLUDED_DIRS, type ResolvedConfig } from '../src/config.ts';
 import { frontmatter, redact, scan } from '../src/scan.ts';
 import { Store } from '../src/store.ts';
@@ -55,6 +56,13 @@ describe('locateLine', () => {
     const file = join(dir, 'c.md');
     writeFileSync(file, '- Something else entirely\n');
     assert.throws(() => locateLine(file, 'Never use semicolons in TypeScript files'), ActionRefused);
+  });
+});
+
+describe('verbatim', () => {
+  it('should keep quoted instructions and drop paraphrases', () => {
+    const body = '# Ship\n- **Always** commit after each step\n- Run the tests first\n';
+    assert.deepEqual(verbatim(body, ['Always commit after each step', 'Commit often', 'Run the tests first', 'Run the tests first']), ['Always commit after each step', 'Run the tests first']);
   });
 });
 
@@ -128,5 +136,18 @@ describe('scan and analyze a fixture workspace', () => {
     const kinds = analysis.findings.filter(f => f.items.some(id => deploy.some(t => t.id === id)) || f.kind === 'drift').map(f => f.kind);
     assert.ok(kinds.includes('same-name'), `findings: ${kinds.join(', ')}`);
     assert.ok(kinds.includes('drift'), `findings: ${kinds.join(', ')}`);
+  });
+
+  it('should report a contradiction between a skill and a rule from the review cache', () => {
+    const plain = analyze(inventory);
+    const stack = plain.instructionStacks.find(s => s.agent === 'Claude' && s.focus.length && s.rules.length);
+    assert.ok(stack, 'the project has a place where a skill loads next to a rule');
+    const deploySkill = plain.things.find(t => stack.skills.includes(t.id))!;
+    const claudeMd = plain.things.find(t => stack.rules.includes(t.id))!;
+    const conflict = { title: 'Package manager differs', files: [claudeMd.paths[0]!, deploySkill.paths[0]!], quotes: [{ file: deploySkill.paths[0]!, text: 'Steps.' }], explanation: 'x', happens: 'y', advice: 'z' };
+    const reviewed = analyze(inventory, { instructions: { [stack.key]: { conflicts: [conflict], at: '', model: '' } } });
+    const found = reviewed.findings.find(f => f.kind === 'contradiction' && f.title === 'Package manager differs');
+    assert.ok(found?.items.includes(deploySkill.id), 'the skill is part of the finding');
+    assert.ok(found?.items.includes(claudeMd.id), 'the rule is part of the finding');
   });
 });

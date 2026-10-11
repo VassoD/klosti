@@ -23,7 +23,7 @@ Or pass `--root DIR` (repeatable) for a one-off scan.
 
 ## AI features
 
-The review and "Fix with AI" use your local Claude Code (`claude -p`, with no settings, plugins, hooks, MCP servers or tools loaded) when it is installed, and otherwise the Anthropic API with `ANTHROPIC_API_KEY`. The default model is `claude-opus-5-5`; set `KLOSTI_MODEL` to change it, for example `claude-sonnet-5-5` for lower cost. Results are cached by content, so only new or changed places are reviewed.
+The review and "Fix with AI" use your local Claude Code (`claude -p`, with no settings, plugins, hooks, MCP servers or tools loaded) when it is installed, and otherwise the Anthropic API with `ANTHROPIC_API_KEY`. The default model is `claude-opus-5-5`; set `KLOSTI_MODEL` to change it, for example `claude-sonnet-5-5` for lower cost. The review checks skills for duplicates and overlaps, rule files for contradictions, and skills against your rules and each other: it first quotes the behaviour instructions in each SKILL.md, then looks for any that clash with a rule or another skill loaded in the same place. Results are cached by content, so only new or changed places and skills are reviewed. `klosti review --dry-run` shows how many calls and tokens a review would use.
 
 ## Data
 
