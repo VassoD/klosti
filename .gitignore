@@ -1,0 +1,14 @@
+# Generated, and contains your own instruction text
+data/
+index.html
+
+# Dependencies and build output
+node_modules/
+engine/dist/
+engine/assets/
+*.tgz
+
+# Tooling
+__pycache__/
+.DS_Store
+*.tmp

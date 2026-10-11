@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Rulebook</title>
+<style>
+:root{color-scheme:light;
+--paper:#f6f4ef;--paper-2:#efece5;--card:#fffefb;--ink:#22201c;--ink-2:#4a463f;--muted:#7a756b;--line:#e3dfd5;--line-2:#d6d1c5;
+--clay:#bd5b3b;--clay-soft:#f6e6dd;--clay-ink:#9a4426;
+--high:#b2402c;--medium:#a86a12;--low:#5f6f82;--low-soft:#e8ecf1;--ok:#3f7d5c;--ok-soft:#e3f0e8;
+--claude:#bd5b3b;--codex:#2c6e5c;--cursor:#6a54a8;--gemini:#2f63b6;--other:#7a756b;
+--serif:"Iowan Old Style","Charter","Source Serif 4",Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;--mono:ui-monospace,"SF Mono",Menlo,monospace;
+--radius-lg:14px;--radius:9px;--radius-sm:6px}
+:root[data-theme=dark]{color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--medium:#e0b062;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#e08a68;--codex:#7cc8b0;--cursor:#b9a6f2;--gemini:#8fb4f2}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--medium:#e0b062;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#e08a68;--codex:#7cc8b0;--cursor:#b9a6f2;--gemini:#8fb4f2}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 var(--sans)}
+button,input,select{font:inherit;color:inherit}
+button{background:none;border:0;padding:0;cursor:pointer}
+a{color:var(--clay-ink)}
+:focus-visible{outline:2px solid var(--clay);outline-offset:2px;border-radius:4px}
+code,.path{font-family:var(--mono);font-size:.86em}
+.path{color:var(--muted);overflow-wrap:anywhere}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+[hidden]{display:none!important}
+.app{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;overflow:auto;background:var(--paper-2);border-right:1px solid var(--line);padding:26px 18px 20px;display:flex;flex-direction:column;gap:26px}
+.brand{display:flex;align-items:center;gap:10px;font:600 21px/1 var(--serif);letter-spacing:-.3px;padding:0 8px}
+.nav{display:grid;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:var(--radius-sm);color:var(--ink-2);font-size:14px}
+.nav button:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.nav button[aria-current=page]{background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.nav .n{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.nav .n.alert{color:var(--high);font-weight:600}
+.nav-ico{width:18px;height:18px;flex:none;color:var(--muted)}
+.nav button[aria-current=page] .nav-ico{color:var(--clay)}
+.side-foot{margin-top:auto;font-size:12px;color:var(--muted);padding:0 10px;display:grid;gap:10px}
+.theme{justify-self:start;border:1px solid var(--line-2);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px}
+main{min-width:0}
+.page{max-width:1080px;margin:0 auto;padding:44px 48px 80px}
+.lede{font:500 clamp(28px,3.4vw,40px)/1.18 var(--serif);letter-spacing:-.6px;margin:0 0 14px;max-width:26ch;text-wrap:balance}
+.lede-sub{color:var(--ink-2);max-width:62ch;margin:0}
+h2.section{font:600 22px/1.25 var(--serif);letter-spacing:-.2px;margin:48px 0 6px}
+.section-sub{color:var(--muted);margin:0 0 18px;max-width:66ch;font-size:14px}
+.muted{color:var(--muted)}
+.count-inline{font:400 14px var(--sans);color:var(--muted)}
+.agent{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.agent i{width:8px;height:8px;border-radius:50%;background:var(--c,var(--other));flex:none}
+.agents{display:inline-flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid var(--line-2);border-radius:999px;padding:2px 10px;font-size:12.5px;color:var(--ink-2);background:var(--card);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button.chip:hover{border-color:var(--clay);color:var(--ink)}
+.scope{display:inline-flex;align-items:center;font-size:12px;border-radius:var(--radius-sm);padding:2px 8px;white-space:nowrap}
+.scope.global{background:var(--clay-soft);color:var(--clay-ink)}
+.scope.project{background:var(--low-soft);color:var(--low)}
+.badge-new{font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-soft);border-radius:var(--radius-sm);padding:1px 7px}
+.sev{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.sev::before{content:"";width:8px;height:8px;border-radius:2px;background:currentColor}
+.sev.high{color:var(--high)}.sev.medium{color:var(--medium)}.sev.low{color:var(--low)}
+.agent-lines{margin:30px 0 0;border-top:1px solid var(--line)}
+.agent-line{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:18px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)}
+.agent-line .agent{font-size:14px}
+.agent-line p{margin:0;color:var(--ink-2);font-size:14px}
+.agent-line button{font-size:13px;color:var(--clay-ink)}
+.review-note{display:flex;gap:12px;align-items:baseline;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin:0 0 16px;font-size:14px;color:var(--ink-2)}
+.review-note code{background:var(--paper-2);padding:1px 6px;border-radius:4px}
+.filters-row{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.seg{display:inline-flex;background:var(--paper-2);border:1px solid var(--line);border-radius:var(--radius);padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{padding:5px 12px;border-radius:6px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .06)}
+.findings{display:grid;gap:10px}
+.finding{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden}
+.finding>button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;width:100%;text-align:left;padding:18px 20px}
+.finding .meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:12px;color:var(--muted)}
+.finding h3{font:600 17px/1.35 var(--serif);margin:0 0 4px}
+.finding .sum{margin:0;color:var(--ink-2);font-size:14px}
+.finding .caret{color:var(--muted);transition:transform .15s;font-size:20px;line-height:1}
+.finding.is-open .caret{transform:rotate(90deg)}
+.finding-body{padding:0 20px 20px}
+.explain{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:2px 0 14px}
+.explain div{background:var(--paper);border-radius:var(--radius);padding:12px 14px;font-size:14px}
+.explain b{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:4px}
+.quotes{margin:0 0 14px;display:grid;gap:8px}
+.quote{border-left:3px solid var(--line-2);padding:4px 12px;font-size:14px}
+.quote .path{display:block;font-size:12px}
+.quote-row{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.quote-row>div{min-width:0}
+.quote.removed{border-left-color:var(--ok)}
+.quote.removed .text{text-decoration:line-through;color:var(--muted)}
+.quote .done{font-size:12px;font-weight:600;color:var(--ok);margin-left:6px}
+.btn-primary{font-size:13px;color:var(--card);background:var(--ink);border-radius:var(--radius-sm);padding:5px 12px}
+.btn-primary:hover{background:var(--clay)}
+.finding-actions{gap:8px}
+.btn-ai{font-size:13px;color:var(--card);background:var(--clay);border-radius:var(--radius-sm);padding:5px 12px;display:inline-flex;gap:6px;align-items:center}
+.btn-ai:hover{background:var(--clay-ink)}
+.btn-ai:disabled{opacity:.7;cursor:progress}
+.fix{margin-top:14px;background:var(--paper);border:1px solid color-mix(in srgb,var(--clay) 40%,var(--line-2));border-radius:var(--radius);padding:14px 16px}
+.fix h4{font:600 15px/1.3 var(--serif);margin:0 0 4px}
+.fix p{margin:0 0 12px;font-size:14px;color:var(--ink-2)}
+.edit{margin:0 0 12px}
+.edit .path{display:block;margin-bottom:4px;font-size:12px}
+.diff{border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--line)}
+.diff pre{margin:0;padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.6 var(--mono)}
+.diff .old{background:color-mix(in srgb,var(--high) 10%,var(--card));color:var(--ink-2)}
+.diff .old::before{content:"Before";display:block;font:600 11px var(--sans);color:var(--high);margin-bottom:2px}
+.diff .new{background:color-mix(in srgb,var(--ok) 12%,var(--card));color:var(--ink)}
+.diff .new::before{content:"After";display:block;font:600 11px var(--sans);color:var(--ok);margin-bottom:2px}
+.diff .new.empty{color:var(--muted);font-style:italic}
+.fix .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fix .cost{font-size:12px;color:var(--muted)}
+.line-confirm{margin-top:8px;background:var(--paper);border:1px solid color-mix(in srgb,var(--high) 35%,var(--line-2));border-radius:var(--radius);padding:10px 12px;font-size:13px}
+.line-confirm pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.6 var(--mono);margin:6px 0 10px;color:var(--ink)}
+.line-confirm .actions{display:flex;gap:8px}
+.items-row{display:flex;gap:6px;flex-wrap:wrap}
+.finding-actions{display:flex;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.btn-quiet{font-size:13px;color:var(--muted);border:1px solid var(--line-2);border-radius:var(--radius-sm);padding:5px 12px;background:var(--card)}
+.btn-quiet:hover{color:var(--ink);border-color:var(--ink-2)}
+.finding.is-dismissed{opacity:.7}
+.loc{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed var(--line)}
+.loc:last-child{border-bottom:0}
+.btn-danger{font-size:12.5px;color:var(--high);border:1px solid color-mix(in srgb,var(--high) 40%,var(--line-2));border-radius:var(--radius-sm);padding:3px 10px;background:var(--card);white-space:nowrap}
+.btn-danger:hover,.btn-danger.confirming{background:var(--high);color:var(--card);border-color:var(--high)}
+.btn-danger:disabled{opacity:.6;cursor:progress}
+.remove-box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;font-size:13.5px;color:var(--ink-2);margin:0 0 20px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:16px;align-items:center;background:var(--ink);color:var(--paper);border-radius:var(--radius);padding:10px 16px;font-size:14px;box-shadow:0 8px 30px rgb(0 0 0 / .18);z-index:10}
+.toast button{color:var(--clay-soft);font-weight:600}
+.empty-state{background:var(--card);border:1px dashed var(--line-2);border-radius:var(--radius-lg);padding:28px;text-align:center;color:var(--muted)}
+.lens-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:26px 0 22px}
+select.pick{appearance:none;background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237a756b' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line-2);border-radius:var(--radius);padding:8px 34px 8px 12px;font-size:14px;max-width:100%}
+.strata{display:grid;margin:0 0 30px}
+.stratum{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px 20px;border:1px solid var(--line-2);background:var(--card);border-radius:var(--radius-lg);margin-top:-6px}
+.stratum:first-child{margin-top:0}
+.stratum.l0{margin-inline:36px;background:var(--paper-2)}
+.stratum.l1{margin-inline:18px}
+.stratum.l2{background:var(--clay-soft);border-color:color-mix(in srgb,var(--clay) 35%,var(--line-2))}
+.stratum h3{font:600 16px/1.3 var(--serif);margin:0}
+.stratum p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.stratum .count{font:600 26px/1 var(--serif);font-variant-numeric:tabular-nums}
+.band{display:grid;grid-template-columns:210px minmax(0,1fr);gap:28px;padding:26px 0;border-top:1px solid var(--line)}
+.band h3{font:600 17px/1.3 var(--serif);margin:0 0 6px}
+.band .why{font-size:13px;color:var(--muted);margin:0}
+.load-order{list-style:none;margin:0;padding:0;display:grid;gap:10px;counter-reset:step}
+.load-order li{counter-increment:step;display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:start}
+.load-order li::before{content:counter(step);font:600 13px/26px var(--serif);text-align:center;width:26px;height:26px;border-radius:50%;background:var(--paper-2);border:1px solid var(--line-2);color:var(--ink-2)}
+.group{margin:0 0 16px}
+.group-head{display:flex;align-items:baseline;gap:10px;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.group-head b{color:var(--ink);font-weight:600;font-size:14px}
+.tiles{display:flex;flex-wrap:wrap;gap:6px}
+.rows{display:grid;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,2fr) 250px;gap:18px;align-items:start;width:100%;text-align:left;padding:13px 4px;border-bottom:1px solid var(--line)}
+.row:hover{background:color-mix(in srgb,var(--card) 70%,transparent)}
+.row .name{font-weight:600;font-size:14px;overflow-wrap:anywhere;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row .desc{font-size:13px;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.row .right{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.row .flag{color:var(--high);font-size:12px;font-weight:600}
+.pack{margin:0 0 28px}
+.pack-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 6px;flex-wrap:wrap}
+.pack-head h3{font:600 17px/1.3 var(--serif);margin:0}
+.pack-head p{margin:0;font-size:13px;color:var(--muted)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:20px 0 14px}
+.search{display:flex;flex:1 1 220px;min-width:0;background:var(--card);border:1px solid var(--line-2);border-radius:var(--radius);padding:8px 12px;font-size:14px}
+.search input{border:0;background:none;outline:none;width:100%}
+.kind-tabs{margin:26px 0 0}
+.more{margin:8px 0 0;font-size:13px;color:var(--clay-ink)}
+.kinds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kind{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:18px 20px}
+.kind h3{font:600 18px/1.3 var(--serif);margin:0 0 4px;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.kind h3 span{font:500 13px var(--sans);color:var(--muted)}
+.kind p{margin:6px 0;font-size:14px;color:var(--ink-2)}
+.kind dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0 0;font-size:13px}
+.kind dt{color:var(--muted)}
+.kind dd{margin:0;min-width:0}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius-lg)}
+table.wins{width:100%;border-collapse:collapse;font-size:14px;background:var(--card)}
+.wins th,.wins td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+.wins th{font-weight:600;font-size:13px;color:var(--muted);background:var(--paper-2)}
+.wins tr:last-child td{border-bottom:0}
+.wins td:first-child{font-weight:600;min-width:150px}
+.setup{display:grid;gap:0;border-top:1px solid var(--line);margin:0 0 8px}
+.setup-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,2fr);gap:18px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
+.setup-row b{font-weight:600}
+.setup-row .tiles{gap:5px}
+.reco{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--clay);border-radius:var(--radius);padding:16px 18px;margin:0 0 16px}
+.reco h3{font:600 17px/1.3 var(--serif);margin:0 0 8px}
+.reco ol{margin:0;padding-left:20px;font-size:14px;color:var(--ink-2)}
+.reco li{margin:6px 0}
+.reco pre{background:var(--paper-2);border-radius:var(--radius-sm);padding:8px 10px;font:12.5px/1.6 var(--mono);margin:6px 0;white-space:pre-wrap}
+.fixes{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.fixes>li{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px 18px}
+.fix-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.fix-head b{font:600 15px/1.35 var(--serif)}
+.fix-head .muted{font-size:12px}
+.fixes p{margin:4px 0 0;font-size:14px;color:var(--ink-2)}
+.fixes details{margin:10px 0 0}
+.fixes .edit{margin:8px 0 0}
+.history{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.history li{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
+.change{display:inline-flex;gap:6px;align-items:baseline;margin:0 12px 4px 0}
+.change.removed{color:var(--muted);text-decoration:line-through}
+.change .k{font-size:12px;color:var(--muted)}
+details{margin:10px 0;font-size:14px}
+summary{cursor:pointer}
+dialog.drawer{margin:0 0 0 auto;height:100vh;max-height:100vh;width:min(680px,100vw);border:0;border-left:1px solid var(--line);padding:0;background:var(--paper);color:var(--ink)}
+dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
+.drawer-top{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;padding:14px 26px;background:var(--paper);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.close{font-size:22px;line-height:1;width:32px;height:32px;border-radius:var(--radius-sm)}
+.close:hover{background:var(--paper-2)}
+.drawer-body{padding:24px 26px 60px}
+.drawer h2{font:600 28px/1.2 var(--serif);letter-spacing:-.4px;margin:10px 0 8px;overflow-wrap:anywhere}
+.drawer .what{font-size:14px;color:var(--ink-2);margin:0 0 18px}
+.facts{display:grid;grid-template-columns:130px minmax(0,1fr);gap:8px 14px;font-size:14px;margin:0 0 20px;padding:16px 0;border-block:1px solid var(--line)}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0;overflow-wrap:anywhere}
+.drawer h4{font:600 15px/1.3 var(--serif);margin:24px 0 8px}
+.markdown{font-size:14px;line-height:1.7;color:var(--ink-2)}
+.markdown h3,.markdown h4,.markdown h5{color:var(--ink);font:600 15px/1.35 var(--serif);margin:20px 0 6px}
+.markdown pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--paper-2);padding:12px;border-radius:var(--radius);font-size:12.5px}
+.markdown code{background:var(--paper-2);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.markdown pre code{background:none;padding:0}
+.markdown ul{padding-left:20px}
+.markdown blockquote{margin:8px 0;padding-left:12px;border-left:2px solid var(--line-2)}
+.cmd{display:block;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--paper-2);padding:10px 12px;border-radius:var(--radius);font-family:var(--mono);font-size:12.5px}
+@media(max-width:960px){.page{padding:32px 28px 64px}.band{grid-template-columns:1fr;gap:12px}.kinds{grid-template-columns:1fr}}
+@media(max-width:760px){.app{display:block}.side{position:static;height:auto;gap:12px;padding:14px 16px}.side-foot,.nav .n,.nav-ico{display:none}.nav{display:flex;flex-wrap:wrap}.nav button{width:auto;padding:7px 10px;font-size:13px}.page{padding:26px 16px 56px}.row{grid-template-columns:1fr;gap:6px}.row .right{justify-content:flex-start}.explain{grid-template-columns:1fr}.agent-line{grid-template-columns:1fr;gap:4px}.stratum.l0{margin-inline:16px}.stratum.l1{margin-inline:8px}.history li{grid-template-columns:1fr;gap:4px}.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="5" y="3" width="16" height="5" rx="2" fill="var(--line-2)"/><rect x="3" y="10" width="20" height="5" rx="2" fill="var(--ink-2)" opacity=".55"/><rect x="1" y="17" width="24" height="6" rx="2" fill="var(--clay)"/></svg>Rulebook</div>
+  <nav class="nav" aria-label="Sections">
+    <button data-view="overview"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4.5l3 1.8"/></svg>Overview<span class="n" id="n-findings"></span></button>
+    <button data-view="lens"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6.5 10 3l7 3.5-7 3.5z"/><path d="m3 10 7 3.5 7-3.5M3 13.5 10 17l7-3.5"/></svg>Where things apply</button>
+    <button data-view="inventory"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/></svg>Everything installed<span class="n" id="n-things"></span></button>
+    <button data-view="guide"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4.5h5a2 2 0 0 1 2 2V16a1.5 1.5 0 0 0-1.5-1.5H4z"/><path d="M11 6.5a2 2 0 0 1 2-2h3v10h-5.5"/></svg>What's what</button>
+    <button data-view="changes"><svg class="nav-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10a6 6 0 1 0 1.8-4.3M4 4v3h3"/></svg>Changes<span class="n" id="n-new"></span></button>
+  </nav>
+  <div class="side-foot">
+    <div id="scan-line"></div>
+    <div id="mode-line">Read-only. Nothing leaves this page.</div>
+    <button class="theme" id="rescan" type="button" hidden>Scan now</button>
+    <button class="theme" id="theme" type="button">Switch theme</button>
+  </div>
+</aside>
+<main><div class="page" id="page"></div></main>
+</div>
+<div class="toast" id="updated" role="status" hidden><span>Something changed on disk.</span><button type="button" id="reload">Reload</button></div>
+<div class="toast" id="toast" role="status" hidden><span id="toast-text"></span><button id="toast-undo" type="button">Undo</button></div>
+<dialog class="drawer" id="drawer" aria-labelledby="drawer-title"><div class="drawer-top"><span id="drawer-kind"></span><button class="close" id="close" aria-label="Close">×</button></div><div class="drawer-body" id="drawer-body"></div></dialog>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(()=>{
+'use strict';
+const D=JSON.parse(document.getElementById('data').textContent);
+const $=id=>document.getElementById(id);
+const byId=new Map(D.things.map(t=>[t.id,t]));
+const projectsById=new Map(D.projects.map(p=>[p.id,p]));
+const AGENTS=['Claude','Codex','Cursor','Gemini'];
+const NEW_WINDOW_DAYS=14,DAY_MS=864e5,ROW_LIMIT=40;
+const KIND={rule:{one:'rule file',many:'rule files',title:'Rules'},skill:{one:'skill',many:'skills',title:'Skills'},command:{one:'command',many:'commands',title:'Commands'},subagent:{one:'subagent',many:'subagents',title:'Subagents'},hook:{one:'hook',many:'hooks',title:'Hooks'},mcp:{one:'MCP server',many:'MCP servers',title:'MCP servers'},'output-style':{one:'output style',many:'output styles',title:'Output styles'}};
+const KIND_ORDER=['skill','rule','command','subagent','hook','mcp'];
+const state={view:'overview',sev:'all',lensAgent:'Claude',lensProject:'',kind:'skill',invAgent:'all',invScope:'all',query:'',open:new Set(),expanded:new Set()};
+const baseline=new Date(D.baselineAt),scanned=new Date(D.scannedAt);
+const isNew=t=>!!t.firstSeen&&new Date(t.firstSeen)>baseline&&scanned-new Date(t.firstSeen)<NEW_WINDOW_DAYS*DAY_MS;
+const DISMISS_KEY='rulebook-dismissed';
+const loadDismissed=()=>{try{return new Set(JSON.parse(localStorage.getItem(DISMISS_KEY)||'[]'));}catch(e){return new Set();}};
+const dismissed=loadDismissed();
+const saveDismissed=()=>{try{localStorage.setItem(DISMISS_KEY,JSON.stringify([...dismissed]));}catch(e){}};
+const API=window.RULEBOOK_API||null;
+const PROTECTED=['/plugins/','/skills/synced/','/skills/.system/','/skills-cursor/','/builtin/skills/'];
+const canTrash=(t,path)=>!!API&&['skill','command','subagent'].includes(t.kind)&&!t.plugin&&!PROTECTED.some(m=>path.includes(m));
+function removalNote(t){
+  if(!['skill','command','subagent'].includes(t.kind))return'';
+  if(t.plugin){
+    const claude=t.agents.includes('Claude');
+    const action=API&&claude?`<button class="btn-danger" data-disable-plugin="${t.id}">Disable the ${esc(pluginName(t.plugin))} plugin</button>`:'';
+    const how=claude?(API?'':' To do it from here, open it in the app with <code>npx agent-rulebook</code>.'):' Set <code>enabled = false</code> for it in <code>~/.codex/config.toml</code>.';
+    return`<div class="remove-box"><span>Part of the ${esc(pluginName(t.plugin))} plugin. A single plugin skill cannot be removed, because the next update would bring it back. You can disable the whole plugin.${how}</span>${action}</div>`;
+  }
+  if(t.source==='synced')return'<div class="remove-box"><span>Synced from your claude.ai account. Remove it on claude.ai under Settings, Capabilities, otherwise it comes back.</span></div>';
+  if(t.source==='system')return`<div class="remove-box"><span>Built into ${esc(t.agents[0])}. It cannot be removed.</span></div>`;
+  if(!API)return'<div class="remove-box"><span>To move this to the Trash from here, open it in the app with <code>npx agent-rulebook</code>.</span></div>';
+  return'';
+}
+const live=()=>D.findings.filter(f=>!dismissed.has(f.id));
+const findingsFor=id=>live().filter(f=>f.items.includes(id));
+const present=AGENTS.filter(a=>D.things.some(t=>t.agents.includes(a)));
+
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const short=p=>String(p).replace(/^\/Users\/[^/]+\//,'~/');
+const plural=(n,k)=>`${n} ${n===1?KIND[k].one:KIND[k].many}`;
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const dateLabel=iso=>new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+const inline=s=>esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+function md(text){let html='',list=false,code=false,buf=[];const close=()=>{if(list){html+='</ul>';list=false;}};for(const line of String(text).split('\n')){if(line.trim().startsWith('```')){close();if(code){html+='<pre><code>'+esc(buf.join('\n'))+'</code></pre>';buf=[];}code=!code;continue;}if(code){buf.push(line);continue;}if(/^\s*[-*]\s+/.test(line)||/^\s*\d+[.)]\s+/.test(line)){if(!list){html+='<ul>';list=true;}html+='<li>'+inline(line.replace(/^\s*(?:[-*]|\d+[.)])\s+/,''))+'</li>';}else{close();if(!line.trim()||/^\s*---+\s*$/.test(line))continue;const h=line.match(/^(#{1,4})\s+(.+)/);if(h){const l=Math.min(5,h[1].length+2);html+=`<h${l}>${inline(h[2])}</h${l}>`;}else if(line.startsWith('>'))html+='<blockquote>'+inline(line.replace(/^>\s?/,''))+'</blockquote>';else html+='<p>'+inline(line)+'</p>';}}close();if(buf.length)html+='<pre>'+esc(buf.join('\n'))+'</pre>';return html;}
+
+const agentDot=a=>`<span class="agent" style="--c:var(--${a.toLowerCase()},var(--other))"><i></i>${esc(a)}</span>`;
+const agentList=as=>`<span class="agents">${as.map(agentDot).join('')}</span>`;
+const pluginName=id=>cap(String(id||'').split('@')[0].replace(/[-_]/g,' '));
+const repoName=r=>cap(String(r).split('/').pop().replace(/[-_]/g,' '));
+function packOf(t){
+  if(t.plugin)return{id:'plugin:'+t.plugin,name:`${pluginName(t.plugin)} plugin`,note:`A ${t.agents[0]} plugin. It is enabled or disabled as one unit.`};
+  if(t.origin==='obra/superpowers')return{id:'superpowers',name:'Superpowers',note:'Skill pack from obra/superpowers: a development method (brainstorm, plan, test first, review) as skills.'};
+  if(t.origin)return{id:'repo:'+t.origin,name:repoName(t.origin),note:`Skill pack installed from ${t.origin}.`};
+  if(t.source==='synced')return{id:'synced',name:'From claude.ai',note:'Skills from your claude.ai account, synced into Claude Code.'};
+  if(t.source==='system')return{id:'system:'+t.agents[0],name:`Built into ${t.agents[0]}`,note:'Ships with the app and updates with it.'};
+  if(t.global)return{id:'mine:'+t.kind,name:'Your personal '+KIND[t.kind].many,note:'Available in every project.'};
+  const p=t.projects[0];return{id:'project:'+(p?.id||''),name:p?.name||'Project',note:'Only available inside this project.'};
+}
+function scopeChip(t){
+  if(t.global)return'<span class="scope global">Global</span>';
+  const names=t.projects.map(p=>p.name);
+  return`<span class="scope project" title="${esc(t.projects.map(p=>short(p.path)+(p.subpath?'/'+p.subpath:'')).join(', '))}">${esc(names.slice(0,2).join(', '))}${names.length>2?' +'+(names.length-2):''}</span>`;
+}
+function scopeSentence(t){
+  const who=t.agents.join(' and ')||'No agent';
+  if(t.global)return t.kind==='hook'?`Runs for ${who} in every project.`:`${who} can use it in every project.`;
+  const where=t.projects.map(p=>p.name+(p.subpath?` (only in ${p.subpath})`:'')).join(', ');
+  return t.kind==='hook'?`Runs for ${who} only inside ${where}.`:`${who} can use it only inside ${where}.`;
+}
+const thingChip=id=>{const t=byId.get(id);return t?`<button class="chip" data-thing="${t.id}" title="${esc(KIND[t.kind].one)}">${esc(t.name)}</button>`:'';};
+
+function navCounts(){
+  const serious=live().filter(f=>f.severity==='high').length;
+  $('n-findings').textContent=serious||'';$('n-findings').classList.toggle('alert',serious>0);
+  $('n-things').textContent=D.things.length;
+  const fresh=D.things.filter(isNew).length;$('n-new').textContent=fresh?fresh+' new':'';
+  $('scan-line').textContent='Scanned '+dateLabel(D.scannedAt);
+}
+function render(){
+  document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===state.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+  $('page').innerHTML=({overview,lens,inventory,guide,changes})[state.view]();
+}
+
+const SEV_LABEL={high:'Act on this',medium:'Worth checking',low:'For your information'};
+const KIND_LABEL={'same-name':'Same name',overlap:'Overlap',contradiction:'Contradiction',drift:'Different instructions',budget:'Skill list size','shadows-builtin':'Replaces a built-in',hidden:'Hidden instructions'};
+function overview(){
+  const count=k=>D.things.filter(t=>t.kind===k).length;
+  const high=live().filter(f=>f.severity==='high').length,medium=live().filter(f=>f.severity==='medium').length;
+  const lede=high?`${high} ${high===1?'clash needs':'clashes need'} a decision from you.`:medium?`Nothing clashes, but ${medium} ${medium===1?'thing is':'things are'} worth a look.`:'Nothing is clashing right now.';
+  const lines=present.map(a=>{
+    const mine=D.things.filter(t=>t.agents.includes(a));
+    const parts=KIND_ORDER.map(k=>[k,mine.filter(t=>t.kind===k)]).filter(([,v])=>v.length).map(([k,v])=>{const g=v.filter(t=>t.global).length;return plural(v.length,k)+(k==='rule'||k==='skill'?` (${g} global)`:'');});
+    return`<div class="agent-line">${agentDot(a)}<p>${parts.join(', ')}</p><button data-lens-agent="${a}">See where</button></div>`;
+  }).join('');
+  const sevs=[['all','All'],['high','Act on these'],['medium','Worth checking'],['low','For your information']];
+  const list=state.sev==='dismissed'?D.findings.filter(f=>dismissed.has(f.id)):live().filter(f=>state.sev==='all'||f.severity===state.sev);
+  if(state.sev==='dismissed'&&!dismissed.size)state.sev='all';
+  const canReview=!!API&&(!D.ai||!!D.ai.via);
+  const reviewText=D.review.done?`${D.review.total-D.review.done} of ${D.review.total} places changed since the last AI review, or were never reviewed.`:'Overlaps below come from matching words only.';
+  const reviewAction=canReview?`<button class="btn-ai" data-run-review="1">Review now</button>`:D.ai&&!D.ai.via?`<span>${esc(D.ai.detail)}</span>`:`<span>Run <code>npx agent-rulebook review</code> to have Claude check them.</span>`;
+  const review=D.review.done<D.review.total?`<div class="review-note"><span class="sev medium"></span><div style="flex:1">${reviewText} Claude checks for duplicates and contradictions, and only reviews what changed.</div>${reviewAction}</div>`:'';
+  return`<h1 class="lede">${esc(lede)}</h1>
+  <p class="lede-sub">Your agents can reach ${plural(count('skill'),'skill')}, ${plural(count('rule'),'rule')}, ${plural(count('mcp'),'mcp')} and ${plural(count('hook'),'hook')} on this Mac.${high&&medium?` Another ${medium} overlaps are worth checking.`:''} Each item below says what happens today and what you can do.</p>
+  <div class="agent-lines">${lines}</div>
+  <h2 class="section">Worth a look</h2>
+  <p class="section-sub">Open an item to see what happens and the files involved.</p>
+  ${review}
+  <div class="filters-row"><div class="seg" role="group" aria-label="Filter by importance">${sevs.map(([v,l])=>`<button data-sev="${v}" aria-pressed="${state.sev===v}">${l} <span class="muted">${v==='all'?live().length:live().filter(f=>f.severity===v).length}</span></button>`).join('')}${dismissed.size?`<button data-sev="dismissed" aria-pressed="${state.sev==='dismissed'}">Dismissed <span class="muted">${dismissed.size}</span></button>`:''}</div></div>
+  <div class="findings">${list.map(f=>findingCard(f)).join('')||`<div class="empty-state">${state.sev==='all'?'Nothing left to look at. Dismissed items are under Dismissed.':'Nothing here. Try another filter.'}</div>`}</div>`;
+}
+function findingCard(f,forceOpen){
+  const open=forceOpen||state.open.has(f.id);
+  const editable=!!API&&f.kind==='contradiction';
+  const quoteAction=(q,i)=>!editable?'':q.removed?(q.backup?`<button class="btn-quiet" data-restore-line="${esc(q.backup)}" data-open="${f.id}">Restore</button>`:''):`<button class="btn-danger" data-del-line="${f.id}" data-quote="${i}">Delete this line</button>`;
+  const quotes=(f.quotes||[]).map((q,i)=>`<div class="quote${q.removed?' removed':''}" id="q-${f.id}-${i}"><div class="quote-row"><div><span class="text">${esc(q.text)}</span>${q.removed?'<span class="done">Deleted</span>':''}<span class="path">${esc(q.file)}</span></div>${quoteAction(q,i)}</div></div>`).join('');
+  const editHint=f.kind==='contradiction'&&!API&&(f.quotes||[]).length?'<p class="muted" style="font-size:13px;margin:0 0 12px">To delete one side of this from here, open it in the app with <code>npx agent-rulebook</code>.</p>':'';
+  const source=f.reviewed?'Reviewed by Claude':f.verdict==='candidate'?'Word match, not reviewed':f.estimate?'Estimate':'';
+  const gone=dismissed.has(f.id);
+  return`<article class="finding${open?' is-open':''}${gone?' is-dismissed':''}" data-card="${f.id}"><button data-finding="${f.id}" aria-expanded="${open}"><div><div class="meta"><span class="sev ${f.severity}">${SEV_LABEL[f.severity]}</span><span>${esc(KIND_LABEL[f.kind]||f.kind)}${f.partlyFixed?', partly fixed':''}</span><span>${esc(f.where)}</span>${agentList(f.agents)}${source?`<span>${source}</span>`:''}</div><h3>${esc(f.title)}</h3><p class="sum">${esc(f.summary)}</p></div><span class="caret" aria-hidden="true">›</span></button>
+  ${open?`<div class="finding-body"><div class="explain"><div><b>What happens</b>${esc(f.happens)}</div><div><b>What you can do</b>${esc(f.todo)}</div></div>${quotes?`<div class="quotes">${quotes}</div>${editHint}`:''}${f.items.length?`<div class="items-row">${f.items.map(thingChip).join('')}</div>`:''}<div class="fix-slot" id="fix-${f.id}"></div><div class="finding-actions">${editable&&!gone&&(!D.ai||D.ai.via)?`<button class="btn-ai" data-fix="${f.id}" title="Claude proposes an edit. You review it before anything changes.">Fix with AI</button>`:''}${editable&&!gone?`<button class="btn-primary" data-resolve="${f.id}">Mark as resolved</button>`:''}${gone?`<button class="btn-quiet" data-restore="${f.id}">Bring back</button>`:`<button class="btn-quiet" data-dismiss="${f.id}" title="Hide it without changing any file">Ignore this</button>`}</div></div>`:''}</article>`;
+}
+
+function visible(t,agent,pid){return t.agents.includes(agent)&&(t.global||(!!pid&&t.projects.some(p=>p.id===pid)));}
+function lens(){
+  const agent=state.lensAgent;
+  const projectOpts=D.projects.filter(p=>D.things.some(t=>t.agents.includes(agent)&&t.projects.some(x=>x.id===p.id)));
+  if(state.lensProject&&!projectOpts.some(p=>p.id===state.lensProject))state.lensProject='';
+  const pid=state.lensProject,pname=pid?projectsById.get(pid).name:'';
+  const here=D.things.filter(t=>visible(t,agent,pid));
+  const isPlugin=t=>!!t.plugin;
+  const own=here.filter(t=>t.global&&!isPlugin(t)),plugin=here.filter(t=>t.global&&isPlugin(t)),local=here.filter(t=>!t.global);
+  const strata=`<div class="strata" aria-label="Layers"><div class="stratum l0"><div><h3>Global</h3><p>Your own files, plus anything built in or synced, that apply everywhere</p></div><span class="count">${own.length}</span></div><div class="stratum l1"><div><h3>Plugins</h3><p>${esc([...new Set(plugin.map(t=>pluginName(t.plugin)))].join(', ')||'No plugins enabled')}</p></div><span class="count">${plugin.length}</span></div><div class="stratum l2"><div><h3>${pid?esc(pname):'No project'}</h3><p>${pid?'Only here, on top of the layers above':'Pick a project to add its own layer'}</p></div><span class="count">${local.length}</span></div></div>`;
+  const rules=here.filter(t=>t.kind==='rule'&&!t.empty).sort((a,b)=>(a.global===b.global?a.paths[0].length-b.paths[0].length:a.global?-1:1));
+  const ruleList=rules.length?`<ol class="load-order">${rules.map(t=>`<li><div><button class="chip" data-thing="${t.id}">${esc(t.name)}</button> ${scopeChip(t)} ${t.loadsWhen==='nested'?'<span class="muted" style="font-size:12px">loads when working in that folder</span>':''}<div class="path">${esc(short(t.paths.find(p=>pid?p.startsWith(pid):true)||t.paths[0]))}</div></div></li>`).join('')}</ol>`:'<p class="muted">No rule files load here.</p>';
+  const grouped=items=>{const groups=new Map();items.forEach(t=>{const p=packOf(t);if(!groups.has(p.id))groups.set(p.id,{...p,items:[]});groups.get(p.id).items.push(t);});return[...groups.values()].sort((a,b)=>b.items.length-a.items.length).map(g=>`<div class="group"><div class="group-head"><b>${esc(g.name)}</b>${g.items.length}</div><div class="tiles">${g.items.sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<button class="chip" data-thing="${t.id}" title="${esc(t.description)}">${esc(t.name)}${findingsFor(t.id).some(f=>f.severity!=='low')?' <span style="color:var(--high)">●</span>':''}</button>`).join('')}</div></div>`).join('');};
+  const band=(title,why,body)=>`<section class="band"><div><h3>${title}</h3><p class="why">${why}</p></div><div>${body}</div></section>`;
+  const skills=here.filter(t=>t.kind==='skill'||t.kind==='command');
+  const hooks=here.filter(t=>t.kind==='hook'),mcp=here.filter(t=>t.kind==='mcp'),subs=here.filter(t=>t.kind==='subagent');
+  const issues=live().filter(f=>f.agents.includes(agent)&&(f.where==='Everywhere'||(pid&&f.projectIds.includes(pid))));
+  const budget=D.budgets.find(b=>b.agent===agent&&b.project===(pid||null));
+  return`<h1 class="lede">What ${esc(agent)} sees ${pid?'in '+esc(pname):'outside any project'}</h1>
+  <p class="lede-sub">Everything stacks: global first, then plugins, then the project. Pick an agent and a project to see exactly what loads. A red dot marks something with an issue.</p>
+  <div class="lens-controls"><div class="seg" role="group" aria-label="Agent">${present.map(a=>`<button data-lens-agent="${a}" aria-pressed="${a===agent}">${a}</button>`).join('')}</div>
+  <label><span class="sr-only">Project</span><select class="pick" id="lens-project"><option value="">No project (global only)</option>${projectOpts.map(p=>`<option value="${esc(p.id)}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
+  ${strata}
+  ${band('Always loaded','Rule files go into every session, in this order. Later files are more specific. When two contradict, the agent may follow either.',ruleList)}
+  ${band(`Available on demand <span class="count-inline">${skills.length}</span>`,`${esc(agent)} sees each name and description, and reads the full skill only when your request matches or you call it by name.`+(budget&&budget.chars>budget.limit?` Here the descriptions add up to about ${budget.chars.toLocaleString()} characters, so some may be dropped.`:''),skills.length?grouped(skills):'<p class="muted">No skills here.</p>')}
+  ${band('Runs automatically','Hooks are scripts, not instructions. They run on events such as editing a file or starting a session, whatever the model decides.',hooks.length?`<div class="rows">${hooks.map(row).join('')}</div>`:'<p class="muted">No hooks run here.</p>')}
+  ${band('Connected tools','MCP servers give the agent extra tools and data.',mcp.length?`<div class="tiles">${mcp.map(t=>`<button class="chip" data-thing="${t.id}">${esc(t.name)} <span class="muted">${esc(t.mcpScope)}</span></button>`).join('')}</div>`:'<p class="muted">No MCP servers configured here. Account connectors from claude.ai are not stored on disk, so they are not listed.</p>')}
+  ${subs.length?band('Helpers it can delegate to','Subagents work in their own context and report back.',`<div class="tiles">${subs.map(t=>`<button class="chip" data-thing="${t.id}" title="${esc(t.description)}">${esc(t.name)}</button>`).join('')}</div>`):''}
+  ${band(`Issues here <span class="count-inline">${issues.length}</span>`,'Findings that affect this agent in this place.',issues.length?`<div class="findings">${issues.map(f=>findingCard(f)).join('')}</div>`:'<p class="muted">Nothing clashes here.</p>')}`;
+}
+
+function row(t){
+  const flags=findingsFor(t.id).filter(f=>f.severity!=='low').length;
+  const desc=t.kind==='hook'?(t.description||t.command):t.kind==='mcp'?`${t.transport}, ${t.target}`:(t.description||t.title);
+  return`<button class="row" data-thing="${t.id}"><span class="name">${esc(t.name)}${isNew(t)?'<span class="badge-new">New</span>':''}</span><span class="desc">${esc(desc)}</span><span class="right">${flags?`<span class="flag">${flags} issue${flags>1?'s':''}</span>`:''}${agentList(t.agents)}${scopeChip(t)}</span></button>`;
+}
+function inventory(){
+  const q=state.query.toLowerCase();
+  const ofKind=D.things.filter(t=>t.kind===state.kind);
+  const pool=ofKind.filter(t=>(state.invAgent==='all'||t.agents.includes(state.invAgent))&&(state.invScope==='all'||(state.invScope==='global'?t.global:!t.global))&&(!q||[t.name,t.description,t.title,...t.paths,t.command||'',t.target||'',...t.projects.map(p=>p.name)].join(' ').toLowerCase().includes(q)));
+  const kinds=KIND_ORDER.filter(k=>D.things.some(t=>t.kind===k));
+  const groupOf=t=>state.kind==='rule'||state.kind==='hook'||state.kind==='mcp'?(t.global?{id:'g',name:'Global',note:'Applies in every project.'}:{id:t.projects[0]?.id,name:t.projects[0]?.name||'Project',note:short(t.projects[0]?.path||'')}):packOf(t);
+  const groups=new Map();pool.forEach(t=>{const p=groupOf(t);if(!groups.has(p.id))groups.set(p.id,{...p,items:[]});groups.get(p.id).items.push(t);});
+  const sorted=[...groups.values()].sort((a,b)=>(a.id==='g'?-1:b.id==='g'?1:0)||b.items.length-a.items.length||a.name.localeCompare(b.name));
+  const packs=sorted.map(g=>{const all=state.expanded.has(g.id);const items=g.items.sort((a,b)=>a.name.localeCompare(b.name));return`<section class="pack"><div class="pack-head"><h3>${esc(g.name)} <span class="count-inline">${items.length}</span></h3><p>${esc(g.note)}</p></div><div class="rows">${items.slice(0,all?items.length:ROW_LIMIT).map(row).join('')}</div>${items.length>ROW_LIMIT&&!all?`<button class="more" data-expand="${esc(g.id)}">Show all ${items.length}</button>`:''}</section>`;}).join('');
+  return`<h1 class="lede">Everything installed</h1>
+  <p class="lede-sub">Grouped by where it came from, so a plugin or a skill pack stays together. Global means every project. A project name means only there.</p>
+  <div class="seg kind-tabs" role="group" aria-label="Type">${kinds.map(k=>`<button data-kind="${k}" aria-pressed="${state.kind===k}">${KIND[k].title} <span class="muted">${D.things.filter(t=>t.kind===k).length}</span></button>`).join('')}</div>
+  <div class="toolbar"><label class="search"><span class="sr-only">Search</span><input id="q" type="search" placeholder="Search names, descriptions, paths" value="${esc(state.query)}"></label>
+  <div class="seg" role="group" aria-label="Agent"><button data-inv-agent="all" aria-pressed="${state.invAgent==='all'}">All agents</button>${AGENTS.filter(a=>ofKind.some(t=>t.agents.includes(a))).map(a=>`<button data-inv-agent="${a}" aria-pressed="${state.invAgent===a}">${a}</button>`).join('')}</div>
+  <div class="seg" role="group" aria-label="Scope">${[['all','Anywhere'],['global','Global'],['project','Project']].map(([v,l])=>`<button data-inv-scope="${v}" aria-pressed="${state.invScope===v}">${l}</button>`).join('')}</div></div>
+  <p class="muted" style="font-size:13px;margin:0 0 20px">Showing ${pool.length} of ${ofKind.length} ${KIND[state.kind].many}</p>
+  ${packs||'<div class="empty-state">No matches. Clear the search or pick another filter.</div>'}`;
+}
+
+function guide(){
+  const n=k=>D.things.filter(t=>t.kind===k).length;
+  const example=k=>{const t=D.things.find(x=>x.kind===k&&!x.empty&&!x.global)||D.things.find(x=>x.kind===k&&!x.empty);return t?`<button class="chip" data-thing="${t.id}">${esc(t.name)}</button>`:'<span class="muted">none found</span>';};
+  const kinds=[
+    ['rule','Rules','Standing instructions, always on.','CLAUDE.md, AGENTS.md and Cursor rules go into every session. Keep them short: every line costs attention on every request.','At the start of every session','You write them','CLAUDE.md, AGENTS.md, .cursor/rules'],
+    ['skill','Skills','Know-how loaded only when needed.','A folder with a SKILL.md. The agent always sees the name and description, and reads the rest when your request matches or you type /name.','When a request matches, or on /name','The model, or you','~/.claude/skills, .claude/skills, .agents/skills'],
+    ['command','Commands','Prompts you run by name.','The older form of a /name shortcut. Claude Code has merged them into skills, and a skill with the same name wins.','When you type /name','You','.claude/commands'],
+    ['subagent','Subagents','Helpers with their own context.','The main agent hands them a task. They work separately with their own tools and report back, which keeps long searches out of your conversation.','When the agent delegates','The model','.claude/agents, plugins'],
+    ['hook','Hooks','Scripts that always run.','Not instructions but real commands that fire on events, such as editing a file or starting a session. The model cannot skip them, and every matching hook runs.','On events, every time','Claude Code itself','settings.json, plugin hooks.json'],
+    ['mcp','MCP servers','Extra tools and data.','Connections such as Figma or Playwright that add tools the agent can call.','When the agent calls a tool','The model','.mcp.json, ~/.claude.json, config.toml'],
+  ];
+  const cards=kinds.map(([k,title,tag,body,when,who,where])=>`<article class="kind"><h3>${title}<span>${n(k)} here</span></h3><p><strong>${tag}</strong> ${body}</p><dl><dt>Loads</dt><dd>${when}</dd><dt>Triggered by</dt><dd>${who}</dd><dt>Lives in</dt><dd><code>${where}</code></dd><dt>Example</dt><dd>${example(k)}</dd></dl></article>`).join('');
+  return`<h1 class="lede">What's what</h1>
+  <p class="lede-sub">Six kinds of things shape what your agents do. They differ in when they load and who decides to use them. Most of them work across agents: what decides who uses a file is mostly the folder it sits in.</p>
+  <h2 class="section">The building blocks</h2><p class="section-sub">Rules are always on. Skills, commands and subagents are pulled in when needed. Hooks always run. MCP servers add tools.</p>
+  <div class="kinds">${cards}</div>
+  <h2 class="section">Bundles</h2><p class="section-sub">Most of what you have arrived in bundles, not one by one.</p>
+  <div class="kinds"><article class="kind"><h3>Plugins<span>${D.plugins.length} enabled</span></h3><p>A package that can contain skills, commands, subagents, hooks and MCP servers. You install it from a marketplace and turn it on or off as one unit. Plugin skills are named <code>plugin:skill</code>, so they never clash with yours by name, but they can still overlap in purpose.</p></article>
+  <article class="kind"><h3>Skill packs<span>${D.things.filter(t=>t.origin&&!t.plugin).length} skills</span></h3><p>A set of skills from one repository, copied into a project with the skills CLI and listed in <code>skills-lock.json</code>. <strong>Superpowers</strong> (obra/superpowers) is one: a full development method (brainstorm, write a plan, test first, review) as skills. Its <code>using-superpowers</code> skill tells the agent to look for a skill before every reply, which changes its behaviour noticeably.</p></article></div>
+  ${rulesFilesSection()}
+  <h2 class="section">Who wins when things collide</h2><p class="section-sub">From the Claude Code and Codex documentation. Where the docs say nothing, so does this table.</p>
+  <div class="table-wrap"><table class="wins"><thead><tr><th>Situation</th><th>Claude Code</th><th>Codex</th></tr></thead><tbody>
+  <tr><td>Two skills with the same name</td><td>Personal beats project. Plugin skills are namespaced, so they never clash by name.</td><td>Not merged or ranked. Both can show up.</td></tr>
+  <tr><td>Two skills that do similar things</td><td>No tie-break. Claude picks by description and may load both.</td><td>Same: picked by description.</td></tr>
+  <tr><td>Too many skills</td><td>Every name is kept. Past about 1% of the context window, descriptions of the least used skills are dropped.</td><td>Descriptions are limited to about 2% of the context window.</td></tr>
+  <tr><td>Rules that contradict</td><td>All rule files are combined, and Claude "may pick one arbitrarily".</td><td>Files closer to your folder come later and override earlier ones.</td></tr>
+  <tr><td>CLAUDE.md and AGENTS.md in one project</td><td>Reads CLAUDE.md. Reads AGENTS.md only when there is no CLAUDE.md, or when CLAUDE.md imports it with @AGENTS.md.</td><td>Reads AGENTS.md only.</td></tr>
+  <tr><td>A command and a skill with the same name</td><td>The skill wins. A skill also replaces a built-in command with the same name.</td><td>Not applicable.</td></tr>
+  <tr><td>Same MCP server in two places</td><td>Local, then project, then user, then plugin. The winning entry is used whole.</td><td>Not documented.</td></tr>
+  <tr><td>Two hooks on the same event</td><td>Both run. Hooks add up and never replace each other.</td><td>Both run.</td></tr>
+  <tr><td>Subagents with the same name</td><td>Project, then personal, then plugin.</td><td>Not applicable.</td></tr>
+  </tbody></table></div>`;
+}
+
+function rulesFilesSection(){
+  const rules=D.things.filter(t=>t.kind==='rule'&&!t.global&&!t.empty);
+  const byProject=new Map();
+  rules.forEach(t=>t.projects.filter(p=>!p.subpath).forEach(p=>{if(!byProject.has(p.id))byProject.set(p.id,{name:p.name,claude:false,agents:false,shared:false});const e=byProject.get(p.id);if(t.family==='Claude')e.claude=true;if(t.family==='Codex / shared'){e.agents=true;if(t.agents.includes('Claude'))e.shared=true;}}));
+  const list=[...byProject.entries()].sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const chips=items=>items.length?`<div class="tiles">${items.map(([id,e])=>`<button class="chip" data-lens-project="${esc(id)}">${esc(e.name)}</button>`).join('')}</div>`:'<span class="muted">None</span>';
+  const drift=list.filter(([,e])=>e.claude&&e.agents&&!e.shared),linked=list.filter(([,e])=>e.claude&&e.agents&&e.shared),onlyAgents=list.filter(([,e])=>e.agents&&!e.claude),onlyClaude=list.filter(([,e])=>e.claude&&!e.agents);
+  const globalOf=agent=>D.things.filter(t=>t.kind==='rule'&&t.global&&t.agents.includes(agent));
+  const describeGlobal=agent=>{const g=globalOf(agent);if(!g.length)return'<span class="muted">No global rule file</span>';return g.map(t=>`<button class="chip" data-thing="${t.id}">${esc(short(t.paths[0]))}</button>${t.empty?' <span class="muted">empty</span>':` <span class="muted">${t.lines} lines</span>`}`).join(' ');};
+  const codexGlobal=D.things.find(t=>t.kind==='rule'&&t.global&&t.family==='Codex / shared');
+  return`<h2 class="section">AGENTS.md, CLAUDE.md and SKILL.md</h2>
+  <p class="section-sub">Three Markdown files with three jobs. AGENTS.md and CLAUDE.md are rules that load every time. SKILL.md is know-how that loads only when it is needed.</p>
+  <div class="table-wrap"><table class="wins"><thead><tr><th></th><th>AGENTS.md</th><th>CLAUDE.md</th><th>SKILL.md</th></tr></thead><tbody>
+  <tr><td>What it is</td><td>Project rules for any agent</td><td>Project rules for Claude</td><td>One skill: a how-to for a specific task, in its own folder</td></tr>
+  <tr><td>When it loads</td><td>Every session</td><td>Every session</td><td>Only the name and description up front. The rest when a request matches, or when you type /name.</td></tr>
+  <tr><td>Read by</td><td>An open format: Codex, Cursor, GitHub Copilot, Windsurf, Zed and others. Gemini CLI when configured. Claude Code when there is no CLAUDE.md, or when CLAUDE.md imports it.</td><td>Claude Code only</td><td>An open format too, used by Claude, Codex, Cursor and others. Each agent looks in its own folder.</td></tr>
+  <tr><td>Where it lives</td><td>Project root, optionally subfolders. Codex global: <code>~/.codex/AGENTS.md</code></td><td>Project root or <code>.claude/</code>, optionally subfolders. Global: <code>~/.claude/CLAUDE.md</code></td><td><code>.claude/skills/name/</code> for Claude, <code>.agents/skills/name/</code> for Codex, plus plugins</td></tr>
+  <tr><td>Extras</td><td>A nested file adds rules for its folder. The closest file wins.</td><td><code>@file</code> imports, a private <code>CLAUDE.local.md</code>, <code>.claude/rules/</code> files for matching paths</td><td>Can bring scripts, templates and reference files alongside it</td></tr>
+  <tr><td>Best for</td><td>Conventions every agent should follow: stack, commands, style</td><td>Claude-only notes, or a one-line import of AGENTS.md</td><td>Procedures: deploy, release, review, a framework guide</td></tr>
+  <tr><td>Keep it</td><td>Short. Every line costs attention on every request.</td><td>Short, for the same reason</td><td>As long as the task needs. Only its description costs anything until it is used.</td></tr>
+  </tbody></table></div>
+  <div class="reco" style="margin-top:16px"><h3>If you switch between agents</h3><ol>
+  <li><strong>Make AGENTS.md the one source of truth</strong> in each project, so every agent reads the same rules.</li>
+  <li><strong>Give Claude a two-line CLAUDE.md</strong> that imports it, and keep only Claude-specific notes under it:<pre>@AGENTS.md
+
+# Claude-only notes (optional)</pre>Leaving CLAUDE.md out also works, since Claude then reads AGENTS.md directly, but the import is explicit and survives someone adding a CLAUDE.md later.</li>
+  <li><strong>Remember global rules do not travel.</strong> Your <code>~/.claude/CLAUDE.md</code> reaches only Claude. Put rules every agent should follow in the project AGENTS.md, or copy them to each tool's global file.</li>
+  <li><strong>Share skills the same way.</strong> SKILL.md is also an open format, but each agent looks in its own folder: Claude in <code>.claude/skills</code>, Codex in <code>.agents/skills</code>. Keep one copy in <code>.agents/skills</code> and link <code>.claude/skills</code> to it, which is what the skills CLI did in newspulse.</li>
+  </ol></div>
+  <div class="reco"><h3>Better than one long file</h3><ol>
+  <li><strong>Scoped rules</strong> load only where they apply, which keeps every session lighter: nested AGENTS.md files per folder (all agents), <code>.claude/rules/*.md</code> with a <code>paths:</code> list (Claude), <code>.cursor/rules/*.mdc</code> with globs (Cursor).</li>
+  <li><strong>Skills for procedures.</strong> Step-by-step workflows (release, deploy, review) belong in a skill, which loads only when needed, not in a rule file that loads every time.</li>
+  <li><strong>Hooks for must-haves.</strong> Anything that must always happen, like formatting or tests after an edit, is safer as a hook, because a rule can be ignored and a hook cannot.</li>
+  </ol></div>
+  <h3 style="font:600 17px/1.3 var(--serif);margin:26px 0 4px">How your projects are set up</h3><p class="section-sub">Based on the rule files at each project's root. Click a project to see what loads there.</p>
+  <div class="setup">
+  <div class="setup-row"><div><b>Global rules</b><div class="muted" style="font-size:13px">Apply in every project</div></div><div>Claude: ${describeGlobal('Claude')}<br>Codex: ${describeGlobal('Codex')}${codexGlobal?.empty?'<div class="muted" style="font-size:13px;margin-top:4px">Codex gets none of your global rules.</div>':''}</div></div>
+  <div class="setup-row"><div><b>Both files, not linked</b><div class="muted" style="font-size:13px">Claude and Codex follow different rules</div></div><div>${chips(drift)}</div></div>
+  <div class="setup-row"><div><b>Both files, linked</b><div class="muted" style="font-size:13px">CLAUDE.md imports AGENTS.md</div></div><div>${chips(linked)}</div></div>
+  <div class="setup-row"><div><b>Only AGENTS.md</b><div class="muted" style="font-size:13px">Every agent reads it, Claude included</div></div><div>${chips(onlyAgents)}</div></div>
+  <div class="setup-row"><div><b>Only CLAUDE.md</b><div class="muted" style="font-size:13px">Codex and other agents get no project rules</div></div><div>${chips(onlyClaude)}</div></div>
+  </div>`;
+}
+const ACTION_TEXT={'ai-fix':'Fixed with AI','delete-line':'Deleted a line',restore:'Restored from backup',trash:'Moved to the Trash','disable-plugin':'Disabled a plugin',resolve:'Marked as resolved',unresolve:'Put back on the list'};
+const FIX_WINDOW_MS=3*60*1000;
+const SIGN={added:'+',changed:'~',removed:'−'},VERB={added:'Added',changed:'Changed',removed:'Removed'};
+const whenLabel=iso=>new Date(iso).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+function actionEntry(a,first,restoredBackups){
+  const what=a.title||a.name||(a.files||[]).join(', ');
+  const diffs=(a.edits||[]).map(e=>`<div class="edit"><span class="path">${esc(e.file)}</span><div class="diff"><pre class="old">${esc(e.before)}</pre><pre class="new${e.after.trim()?'':' empty'}">${e.after.trim()?esc(e.after):'(deleted)'}</pre></div></div>`).join('');
+  const canRestore=API&&(a.kind==='ai-fix'||a.kind==='delete-line')&&a.backups?.length&&!a.backups.every(b=>restoredBackups.has(b));
+  const restore=canRestore?`<button class="btn-quiet" data-restore-backups="${esc(JSON.stringify(a.backups))}">Restore</button>`:'';
+  const hint=a.kind==='trash'?' <span class="muted">Use Put Back in Finder to restore it.</span>':'';
+  return`<li><div class="fix-head"><div><span class="muted">${esc(ACTION_TEXT[a.kind]||a.kind)}, ${whenLabel(a.at)}</span><br><b>${esc(what)}</b>${hint}</div>${restore}</div>${a.summary?`<p>${esc(a.summary)}</p>`:''}${diffs?`<details ${first?'open':''}><summary>See the change</summary>${diffs}</details>`:''}</li>`;
+}
+function scanEntry(e,changes){
+  const item=c=>{const t=c.cls==='removed'?null:D.things.find(x=>x.paths.includes(c.path));const folder=short(c.path).split('/').slice(0,-1).join('/').replace(/\/(?:\.claude|\.agents)\/skills\/[^/]+$/,'')||'~';return`<span class="change ${c.cls}" title="${VERB[c.cls]}"><span aria-hidden="true">${SIGN[c.cls]}</span><span class="sr-only">${VERB[c.cls]}</span> ${t?`<button class="chip" data-thing="${t.id}">${esc(c.name)}</button>`:esc(c.name)} <span class="k">${esc(c.kind)}, ${esc(c.agent)}, in ${esc(folder)}</span></span>`;};
+  return`<li><div class="fix-head"><div><span class="muted">Noticed by a scan, ${whenLabel(e.at)}</span></div></div><p>${changes.map(item).join('')}</p></li>`;
+}
+function historyList(){
+  const actions=D.actions||[];
+  const restoredBackups=new Set(actions.filter(a=>a.kind==='restore').flatMap(a=>a.backups||[]));
+  const fileActions=actions.filter(a=>a.edits||a.files).map(a=>({at:new Date(a.at),files:(a.edits||[]).map(e=>e.file).concat(a.files||[])}));
+  const fromPage=(c,at)=>fileActions.some(a=>Math.abs(a.at-at)<FIX_WINDOW_MS&&a.files.some(f=>short(c.path)===f||short(c.path).startsWith(f+'/')));
+  const events=actions.map(a=>({at:new Date(a.at),html:first=>actionEntry(a,first,restoredBackups)}));
+  D.history.forEach(e=>{
+    const at=new Date(e.at);
+    const changes=['added','changed','removed'].flatMap(cls=>e[cls].map(c=>({...c,cls}))).filter(c=>!fromPage(c,at));
+    if(changes.length)events.push({at,html:()=>scanEntry(e,changes)});
+  });
+  events.sort((a,b)=>b.at-a.at);
+  if(!events.length)return`<div class="empty-state">Nothing yet. Tracking started ${dateLabel(D.baselineAt)}: your fixes, new installs and outside edits will show up here.</div>`;
+  return`<ul class="fixes">${events.map((ev,i)=>ev.html(i===0)).join('')}</ul>`;
+}
+function changes(){
+  return`<h1 class="lede">Changes</h1><p class="lede-sub">One timeline: what you fixed from this page, plus anything the scans noticed on their own, like a new skill or a rule file edited by hand. The watcher rescans when your skill or plugin folders change, and every 3 hours.</p>
+  <h2 class="section">History</h2><p class="section-sub">Rule edits made here can be restored from their backup. In scan entries, + means added, ~ changed and − removed.</p>${historyList()}
+  <h2 class="section">About this scan</h2><p class="section-sub">Scanned ${dateLabel(D.scannedAt)}. ${D.errors.length?D.errors.length+' problems while reading folders.':'Every folder was readable.'} ${D.memories.length} Claude memory files were found and left unread.${D.review.lastAt?` Last AI review ${dateLabel(D.review.lastAt)}.`:''}</p>
+  <details><summary>Folders scanned (${D.roots.length})</summary>${D.roots.map(r=>`<div class="path">${esc(short(r))}</div>`).join('')}</details>
+  <details><summary>Limits</summary><ul>${D.limits.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><p class="muted">Skipped folders: ${esc(D.excluded.join(', '))}</p></details>`;
+}
+
+const WHAT={rule:'Standing instructions loaded into every session where it applies.',skill:'Know-how the agent loads when a request matches its description, or when you call it by name.',command:'A prompt you run by typing its name after a slash.',subagent:'A helper the agent can hand work to. It runs in its own context.',hook:'A script that runs automatically on an event. The model does not decide.',mcp:'A server that gives the agent extra tools.','output-style':'Changes tone and format for a whole session.'};
+function showThing(id){
+  const t=byId.get(id);if(!t)return;
+  const fs=findingsFor(id);
+  const pack=['skill','command','subagent'].includes(t.kind)?packOf(t):null;
+  const facts=[['Where it applies',esc(scopeSentence(t))],['Agents',t.agents.length?agentList(t.agents):'None detected'],pack&&['Came from',esc(pack.name)+(t.version?` <span class="muted">version ${esc(t.version)}</span>`:'')],t.kind==='hook'&&['Event',esc(t.event)+(t.matcher?` <span class="muted">for tools matching ${esc(t.matcher)}</span>`:'')],t.kind==='mcp'&&['Connection',`${esc(t.transport)}, ${esc(t.target)}`],t.kind==='mcp'&&['Scope',esc(t.mcpScope)],t.manualOnly&&['Invocation','Manual only. The model will not load it on its own.'],t.firstSeen&&['First seen',dateLabel(t.firstSeen)+(t.changedAt?`, updated ${dateLabel(t.changedAt)}`:'')]].filter(Boolean);
+  const locs=(t.locations||[]).map(l=>{
+    const removeLabel=l.linkTarget?'Remove link':'Move to Trash';
+    const who=(t.locations.length>1&&l.agents?.length)?` <span class="muted">for ${esc(l.agents.join(' and '))}</span>`:'';
+    const hint=l.linkTarget?`<div class="muted" style="font-size:12px">A link to ${esc(short(l.linkTarget))}. Removing it keeps the original.</div>`:'';
+    return`<div class="loc"><div><span class="path">${esc(short(l.path))}</span>${who}${hint}</div>${canTrash(t,l.path)?`<button class="btn-danger" data-trash="${t.id}" data-path="${esc(l.path)}">${removeLabel}</button>`:''}</div>`;
+  }).join('');
+  const issues=fs.length?`<h4>Issues</h4><div class="findings">${fs.map(f=>findingCard(f,true)).join('')}</div>`:'';
+  const body=t.kind==='hook'?`<h4>Command</h4><code class="cmd">${esc(t.command)}</code>`:t.body?`<h4>${t.kind==='rule'?'Full text':'Instructions'}</h4><div class="markdown">${md(t.body)}</div>`:'';
+  $('drawer-kind').textContent=cap(KIND[t.kind].one);
+  $('drawer-body').innerHTML=`<div class="agents">${isNew(t)?'<span class="badge-new">New</span>':''}${scopeChip(t)}</div><h2 id="drawer-title">${esc(t.kind==='rule'?t.title:t.name)}</h2><p class="what">${esc(t.description&&t.kind!=='mcp'?t.description:WHAT[t.kind])}</p><dl class="facts">${facts.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}<dt>${(t.locations||[]).length>1?'Files':'File'}</dt><dd>${locs}</dd></dl>${removalNote(t)}${issues}${body}`;
+  if(!$('drawer').open)$('drawer').showModal();
+  $('drawer').scrollTop=0;
+}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const d=b.dataset;
+  if(d.view){go(d.view);}
+  else if(d.sev){state.sev=d.sev;render();}
+  else if(d.delLine){previewLine(d.delLine,+d.quote,b);}
+  else if(d.confirmLine){b.disabled=true;b.textContent='Deleting…';callApi('/api/rule-line',{finding:d.confirmLine,quote:+d.quote,expect:b.closest('.line-confirm').dataset.line});}
+  else if(d.restoreBackups){confirmThen(b,()=>callApi('/api/undo',{backups:JSON.parse(d.restoreBackups)}));}
+  else if(d.restoreLine){b.disabled=true;b.textContent='Restoring…';callApi('/api/undo',{backup:d.restoreLine,open:d.open});}
+  else if(d.resolve){b.disabled=true;callApi('/api/resolve',{finding:d.resolve,resolved:true});}
+  else if(d.fix){proposeFix(d.fix,b);}
+  else if(d.applyFix){b.disabled=true;b.textContent='Applying…';callApi('/api/apply-fix',{proposal:d.applyFix});}
+  else if(d.cancelFix){b.closest('.fix').remove();}
+  else if(d.runReview){b.disabled=true;b.textContent='Reviewing… this can take a minute';callApi('/api/review',{});}
+  else if(d.cancelLine){b.closest('.line-confirm').remove();}
+  else if(d.trash||d.disablePlugin){confirmThen(b,d.trash?()=>callApi('/api/trash',{id:d.trash,path:d.path}):()=>callApi('/api/disable-plugin',{id:d.disablePlugin}));}
+  else if(d.dismiss){const id=d.dismiss;dismissed.add(id);saveDismissed();state.open.delete(id);afterFindingChange();showToast('Ignored. It no longer counts.',()=>{dismissed.delete(id);saveDismissed();state.open.add(id);navCounts();render();});}
+  else if(d.restore){dismissed.delete(d.restore);saveDismissed();afterFindingChange();showToast('Brought back',null);}
+  else if(d.finding){const inDrawer=!!b.closest('dialog');if(inDrawer)return;state.open.has(d.finding)?state.open.delete(d.finding):state.open.add(d.finding);b.closest('.finding').outerHTML=findingCard(D.findings.find(f=>f.id===d.finding));}
+  else if(d.thing)showThing(d.thing);
+  else if(d.lensAgent){state.lensAgent=d.lensAgent;go('lens');}
+  else if(d.lensProject){state.lensProject=d.lensProject;go('lens');}
+  else if(d.kind){state.kind=d.kind;state.invAgent='all';render();}
+  else if(d.invAgent){state.invAgent=d.invAgent;render();}
+  else if(d.invScope){state.invScope=d.invScope;render();}
+  else if(d.expand){state.expanded.add(d.expand);render();}
+});
+document.addEventListener('change',e=>{if(e.target.id==='lens-project'){state.lensProject=e.target.value;render();}});
+document.addEventListener('input',e=>{if(e.target.id==='q'){state.query=e.target.value;const pos=e.target.selectionStart;render();const q=$('q');q.focus();q.setSelectionRange(pos,pos);}});
+const CONFIRM_MS=4000;
+function confirmThen(button,action){
+  if(button.classList.contains('confirming')){button.disabled=true;button.textContent='Working…';action();return;}
+  const original=button.textContent;
+  button.classList.add('confirming');button.textContent='Click again to confirm';
+  setTimeout(()=>{if(!button.disabled){button.classList.remove('confirming');button.textContent=original;}},CONFIRM_MS);
+}
+async function callApi(path,body){
+  try{
+    const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Rulebook-Token':API.token},body:JSON.stringify(body)});
+    const reply=await res.json().catch(()=>({error:'Unexpected reply from the server.'}));
+    if(!res.ok)throw new Error(reply.error||'That did not work.');
+    if(reply.preview)return reply.preview;
+    if(reply.proposal)return reply.proposal;
+    try{sessionStorage.setItem('rulebook-flash',JSON.stringify({message:reply.message,undo:reply.undo||null,open:reply.open||body.open||null,undoResolve:reply.undoResolve||null,resolvedId:reply.undoResolve?body.finding:null}));}catch(e){}
+    location.reload();
+  }catch(err){
+    const msg=err instanceof TypeError?'The Agent Rulebook app is not running. Start it with npx agent-rulebook.':err.message;
+    showToast(msg,null);
+    document.querySelectorAll('.line-confirm').forEach(el=>el.remove());
+    document.querySelectorAll('.btn-danger:disabled').forEach(b=>{b.disabled=false;b.classList.remove('confirming');b.textContent='Try again';});
+  }
+}
+async function proposeFix(findingId,button){
+  const slot=$('fix-'+findingId);if(!slot)return;
+  slot.innerHTML='';
+  const label=button.textContent;
+  button.disabled=true;button.textContent='Claude is thinking…';
+  const proposal=await callApi('/api/propose-fix',{finding:findingId});
+  button.disabled=false;button.textContent=label;
+  if(!proposal)return;
+  const edits=proposal.edits.map(e=>`<div class="edit"><span class="path">${esc(e.path)}</span><div class="diff"><pre class="old">${esc(e.before)}</pre><pre class="new${e.after.trim()?'':' empty'}">${e.after.trim()?esc(e.after):'(deleted)'}</pre></div></div>`).join('');
+  slot.innerHTML=`<div class="fix"><h4>Suggested fix</h4><p>${esc(proposal.summary)}</p>${edits}<div class="actions"><button class="btn-primary" data-apply-fix="${proposal.id}">Apply fix</button><button class="btn-quiet" data-cancel-fix="1">Cancel</button><span class="cost">Files are backed up first, and you can undo.</span></div></div>`;
+  slot.scrollIntoView({block:'nearest'});
+}
+async function previewLine(findingId,quoteIndex,button){
+  const box=button.closest('.quote');
+  box.querySelector('.line-confirm')?.remove();
+  button.disabled=true;
+  const preview=await callApi('/api/rule-line',{finding:findingId,quote:quoteIndex,dryRun:true});
+  button.disabled=false;
+  if(!preview)return;
+  const el=document.createElement('div');
+  el.className='line-confirm';el.dataset.line=preview.line;
+  el.innerHTML=`This deletes line ${preview.lineNumber} of <span class="path">${esc(preview.path)}</span>:<pre>${esc(preview.line)}</pre><div class="actions"><button class="btn-danger confirming" data-confirm-line="${findingId}" data-quote="${quoteIndex}">Delete line</button><button class="btn-quiet" data-cancel-line="1">Cancel</button></div>`;
+  box.appendChild(el);
+}
+function afterFindingChange(){navCounts();if($('drawer').open)$('drawer').close();render();}
+let toastTimer=null,undoAction=null;
+const TOAST_MS=6000;
+const UNDO_EDIT_MS=20000;
+function showToast(text,onUndo,ms=TOAST_MS){undoAction=onUndo;$('toast-text').textContent=text;$('toast-undo').hidden=!onUndo;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{$('toast').hidden=true;},ms);}
+$('toast-undo').addEventListener('click',()=>{const action=undoAction;undoAction=null;$('toast').hidden=true;if(action)action();});
+$('close').addEventListener('click',()=>$('drawer').close());
+$('drawer').addEventListener('click',e=>{if(e.target===$('drawer'))$('drawer').close();});
+const root=document.documentElement;
+try{const saved=localStorage.getItem('rulebook-theme');if(saved)root.dataset.theme=saved;}catch(e){}
+$('theme').addEventListener('click',()=>{const dark=root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;root.dataset.theme=dark?'light':'dark';try{localStorage.setItem('rulebook-theme',root.dataset.theme);}catch(e){}});
+const VIEWS=['overview','lens','inventory','guide','changes'];
+function go(view){state.view=view;if(location.hash.slice(1)!==view)history.replaceState(null,'','#'+view);render();window.scrollTo(0,0);}
+addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v)&&v!==state.view){state.view=v;render();}});
+const initial=location.hash.slice(1);if(VIEWS.includes(initial))state.view=initial;
+const VERSION_POLL_MS=20000;
+if(API){
+  $('rescan').hidden=false;
+  $('rescan').addEventListener('click',()=>{$('rescan').disabled=true;$('rescan').textContent='Scanning…';callApi('/api/rescan',{});});
+  $('reload').addEventListener('click',()=>location.reload());
+  setInterval(async()=>{try{const r=await fetch('/api/version');const v=await r.json();if(D.version&&v.version!==D.version&&!$('drawer').open)$('updated').hidden=false;}catch(e){}},VERSION_POLL_MS);
+}
+if(API)$('mode-line').textContent='Changes are backed up and listed under Changes. AI fixes use your Claude Code.';
+navCounts();render();
+try{
+  const raw=sessionStorage.getItem('rulebook-flash');
+  if(raw){
+    sessionStorage.removeItem('rulebook-flash');
+    const flash=JSON.parse(raw);
+    if(flash.open&&D.findings.some(f=>f.id===flash.open)){state.open.add(flash.open);render();document.querySelector(`[data-card="${flash.open}"]`)?.scrollIntoView({block:'center'});}
+    const undo=!API?null:flash.undo?()=>callApi('/api/undo',Array.isArray(flash.undo)?{backups:flash.undo,open:flash.open}:{backup:flash.undo,open:flash.open}):flash.undoResolve?()=>callApi('/api/resolve',{title:flash.undoResolve,resolved:false,finding:flash.resolvedId}):null;
+    showToast(flash.message,undo,undo?UNDO_EDIT_MS:TOAST_MS);
+  }
+}catch(e){}
+})();
+</script>
+</body></html>
