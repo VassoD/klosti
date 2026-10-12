@@ -25,3 +25,6 @@ site/out/
 site/next-env.d.ts
 site/tsconfig.tsbuildinfo
 site/public/downloads/
+
+# Static site copy for vercel deploy
+.deploy/
