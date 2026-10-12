@@ -121,6 +121,7 @@ export interface InstalledPlugin {
   version: string | null;
   path: string;
   installedAt: string | null;
+  homepage?: string | null;
 }
 
 export interface MemoryIndex {

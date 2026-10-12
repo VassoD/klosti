@@ -3,7 +3,7 @@ import { watch, type FSWatcher } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { ActionRefused, Actions, pickFolder, rescan } from './actions.ts';
+import { ActionRefused, Actions, openInBrowser, pickFolder, rescan } from './actions.ts';
 import { AiRefusedError, AiUnavailableError } from './ai.ts';
 import { HOME, onboardingChoices, type ResolvedConfig } from './config.ts';
 import { payload, renderPage } from './page.ts';
@@ -144,6 +144,7 @@ export class KlostiServer {
       case '/api/resolve': return this.serialize(() => changed({ ...a.resolve(body.finding, body.title, body.resolved ?? true) }));
       case '/api/undo': return this.serialize(() => changed({ ...a.undo(body.backups ?? (body.backup ? [body.backup] : []), body.open ?? undefined) }));
       case '/api/trash': return this.serialize(() => changed({ ...a.trash(body.id ?? '', body.path ?? '') }));
+      case '/api/open-url': openInBrowser(body.path ?? ''); return { message: '' };
       case '/api/pick-folder': { const path = await pickFolder('Choose a folder where you keep code'); return path ? { path } : { cancelled: true }; }
       case '/api/delete-data':
         if (this.reviewing) throw new ActionRefused('Wait for the AI review to finish first.');
