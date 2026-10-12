@@ -185,16 +185,14 @@ type ConflictEdit = (conflict: RuleConflict) => RuleConflict;
  * apply editConflict to each carried contradiction, and mark it so the next review rechecks those places.
  */
 export function rescan(store: Store, config: ResolvedConfig, editConflict?: ConflictEdit): Analysis {
-  const judgements = store.judgements();
   const previous = store.inventory();
-  if (!previous.files) {
-    const { inventory } = scan(config, previous);
-    store.saveInventory(inventory);
-    return analyze(inventory, judgements);
-  }
-  const before = analyze(previous as Inventory, judgements);
   const { inventory } = scan(config, previous);
   store.saveInventory(inventory);
+  // Read the review only after the slow scan: a review running in another process (the CLI next to
+  // the desktop app) saves answers meanwhile, and saving an older copy below would erase them.
+  const judgements = store.judgements();
+  if (!previous.files) return analyze(inventory, judgements);
+  const before = analyze(previous as Inventory, judgements);
   const after = analyze(inventory, judgements);
   const keysAfter = new Map(after.things.flatMap(t => t.keys.map(k => [k, t.id] as const)));
   const idMap = new Map(before.things.flatMap(t => { const next = t.keys.map(k => keysAfter.get(k)).find(Boolean); return next ? [[t.id, next] as const] : []; }));
