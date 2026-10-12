@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
-import { ActionRefused, backUp, locateLine, restore } from '../src/actions.ts';
+import { ActionRefused, backUp, locateLine, rescan, restore } from '../src/actions.ts';
 import { analyze } from '../src/analyze.ts';
 import { verbatim } from '../src/review.ts';
 import { usesInLog } from '../src/usage.ts';
@@ -166,6 +166,27 @@ describe('scan and analyze a fixture workspace', () => {
     const kinds = analysis.findings.filter(f => f.items.some(id => deploy.some(t => t.id === id)) || f.kind === 'drift').map(f => f.kind);
     assert.ok(kinds.includes('same-name'), `findings: ${kinds.join(', ')}`);
     assert.ok(kinds.includes('drift'), `findings: ${kinds.join(', ')}`);
+  });
+
+  it('should keep review answers another process saves while a rescan is scanning', () => {
+    const config: ResolvedConfig = { codeRoots: [root], agentRoots: [], excluded: EXCLUDED_DIRS, ignored: [], agents: [], onboarded: true, dataDir: join(root, '.data') };
+    const digest = { instructions: ['Steps.'], at: '', model: '' };
+    // Saving the inventory marks the end of the slow scan; the review saves its answer right then, as the CLI does next to the app.
+    class ReviewDuringScan extends Store {
+      scanning = false;
+      override saveInventory(next: Inventory): void {
+        super.saveInventory(next);
+        if (!this.scanning) return;
+        const judgements = this.judgements();
+        judgements.digests['saved-during-scan'] = digest;
+        this.saveJudgements(judgements);
+      }
+    }
+    const store = new ReviewDuringScan(join(root, '.data-race'));
+    store.saveInventory(inventory);
+    store.scanning = true;
+    rescan(store, config);
+    assert.deepEqual(store.judgements().digests['saved-during-scan'], digest);
   });
 
   it('should report a contradiction between a skill and a rule from the review cache', () => {
