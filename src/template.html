@@ -215,15 +215,19 @@ select.pick{appearance:none;background:var(--card) url("data:image/svg+xml,%3Csv
 .welcome-hero{display:flex;align-items:center;gap:12px;margin:0 0 34px}
 .welcome-mark{flex:none}
 .welcome-word{font:600 30px/1 var(--serif);letter-spacing:-.5px}
-.welcome-run{flex:1;height:3px;margin-left:6px;border-radius:3px;background:linear-gradient(90deg,var(--clay),color-mix(in srgb,var(--clay) 25%,transparent));transform-origin:left;position:relative}
-.welcome-run::after{content:"";position:absolute;right:0;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;border:2.5px solid var(--clay);background:var(--paper)}
+.welcome-run{flex:1;min-width:0;height:18px;margin-left:6px;overflow:visible}
+.welcome-thread{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.welcome-run path,.welcome-thread path{fill:none;stroke:var(--clay);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .welcome-intro{margin:0 0 52px}
+.welcome-steps{position:relative}
 .welcome-step{position:relative;padding-left:56px}
 .welcome-step+.welcome-step{margin-top:48px}
-.welcome-step:not(:last-child)::before{content:"";position:absolute;left:14.5px;top:34px;bottom:-50px;width:3px;border-radius:3px;background:var(--clay);transform-origin:top}
 .welcome-step h2.section{margin-top:0}
 .welcome-bead{position:absolute;left:0;top:-2px;z-index:1;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--clay);color:var(--paper);font:600 15px/1 var(--serif)}
-.welcome-bead.is-ring{top:6px;background:var(--paper);border:3px solid var(--clay)}
+.welcome-bead.is-ball{top:6px;background:none}
+.welcome-bead.is-ball svg{width:30px;height:30px;overflow:visible}
+.welcome-bead.is-ball circle{fill:var(--clay)}
+.welcome-bead.is-ball ellipse{fill:none;stroke:var(--paper);stroke-width:1.3;opacity:.55}
 .agent-pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 12px}
 .agent-card{position:relative;display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;transition:transform .25s cubic-bezier(.3,1.4,.5,1),border-color .2s,box-shadow .2s}
 .agent-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px -14px color-mix(in srgb,var(--ink) 60%,transparent)}
@@ -250,20 +254,18 @@ select.pick{appearance:none;background:var(--card) url("data:image/svg+xml,%3Csv
 .welcome-progress{display:none;flex-basis:100%;height:3px;border-radius:3px;background:var(--clay-soft);overflow:hidden;max-width:320px}
 .welcome-progress::before{content:"";display:block;width:40%;height:100%;border-radius:3px;background:var(--clay);animation:welcome-shuttle 1.2s ease-in-out infinite alternate}
 .welcome.is-scanning .welcome-progress{display:block}
-.welcome.is-scanning .welcome-bead.is-ring{border-style:dashed;animation:welcome-spin 2.4s linear infinite}
+.welcome.is-scanning .welcome-bead.is-ball svg{animation:welcome-spin 1.6s linear infinite}
 .welcome.is-shaking .welcome-go{animation:welcome-shake .4s}
-.welcome.enter>*{animation:welcome-rise .6s backwards cubic-bezier(.2,.8,.3,1);animation-delay:var(--d,0s)}
+.welcome.enter>:not(.welcome-steps),.welcome.enter .welcome-step{animation:welcome-rise .6s backwards cubic-bezier(.2,.8,.3,1);animation-delay:var(--d,0s)}
 .welcome.enter .welcome-mark path{stroke-dasharray:1;animation:welcome-draw .9s backwards cubic-bezier(.6,0,.3,1)}
 .welcome.enter .welcome-mark .tail{animation-delay:.8s;animation-duration:.45s}
 .welcome.enter .welcome-word{animation:welcome-fade .5s .6s backwards}
-.welcome.enter .welcome-run{animation:welcome-unspool 1s 1s backwards cubic-bezier(.5,0,.2,1)}
-.welcome.enter .welcome-step:not(:last-child)::before{animation:welcome-unspool-y .8s backwards cubic-bezier(.5,0,.2,1);animation-delay:calc(var(--d,0s) + .35s)}
+.welcome.enter .welcome-run path{stroke-dasharray:1;animation:welcome-draw 1.6s .9s backwards cubic-bezier(.33,1,.68,1)}
+.welcome.enter .welcome-thread path{stroke-dasharray:1;animation:welcome-draw 2.6s .5s backwards cubic-bezier(.33,1,.68,1)}
 .welcome.enter .welcome-bead{animation:welcome-pop .5s backwards cubic-bezier(.3,1.8,.5,1);animation-delay:calc(var(--d,0s) + .1s)}
 @keyframes welcome-rise{from{opacity:0;transform:translateY(12px)}}
 @keyframes welcome-fade{from{opacity:0}}
 @keyframes welcome-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
-@keyframes welcome-unspool{from{transform:scaleX(0)}}
-@keyframes welcome-unspool-y{from{transform:scaleY(0)}}
 @keyframes welcome-pop{from{transform:scale(0)}}
 @keyframes welcome-spin{to{transform:rotate(1turn)}}
 @keyframes welcome-shuttle{from{transform:translateX(-10%)}to{transform:translateX(160%)}}
@@ -274,6 +276,12 @@ select.pick{appearance:none;background:var(--card) url("data:image/svg+xml,%3Csv
 .setting-row.root{cursor:default}
 .setting-row.root label{display:flex;gap:12px;align-items:center;cursor:pointer;min-width:0}
 .setting-row.root{grid-template-columns:1fr auto auto}
+.tree-toggle{display:grid;place-items:center;width:28px;height:28px;border-radius:var(--radius-sm);color:var(--muted)}
+.tree-toggle:hover{background:var(--paper-2);color:var(--ink)}
+.tree-toggle svg{transition:transform .15s ease}
+.tree-toggle[aria-expanded=true] svg{transform:rotate(90deg)}
+.tree-toggle-gap{width:28px}
+@media (prefers-reduced-motion:reduce){.tree-toggle svg{transition:none}}
 .sub-list{display:grid;gap:4px;margin:0 0 6px 28px}
 .setting-row.sub{padding:7px 12px}
 @media (max-width:560px){.setting-row{grid-template-columns:auto 1fr}.setting-row .muted{grid-column:2}}
@@ -372,6 +380,8 @@ dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
 'use strict';
 const D=JSON.parse(document.getElementById('data').textContent);
 const $=id=>document.getElementById(id);
+/** Project boxes the user changed, by path. Kept outside the page so closed folders remember them too. */
+const projectChoices=new Map();
 if(D.onboarding){welcome(D.onboarding);return;}
 /** Counts before the agent filter, so Settings can show what each agent has on this Mac. */
 const FOUND=Object.fromEntries(['Claude','Codex','Cursor','Gemini'].map(a=>[a,D.things.filter(t=>t.agents.includes(a)).length]));
@@ -474,6 +484,7 @@ function render(){
   document.querySelectorAll('[data-view]').forEach(b=>{if(b.dataset.view===state.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   $('page').innerHTML=({overview,lens,inventory,guide,changes,settings})[state.view]();
   if(state.view==='lens')requestAnimationFrame(drawKnots);
+  refreshFolderBoxes();
 }
 
 const SEV_LABEL={high:'Act on this',medium:'Worth checking',low:'For your information'};
@@ -779,6 +790,39 @@ function ignoredSection(){
   const form=API?`<div class="toolbar"><button class="btn-quiet" data-ignore-input="1">Choose a folder to ignore…</button></div>`:`<p class="muted">Add folders to <code>"ignore"</code> in ~/.config/klosti/config.json.</p>`;
   return`<h2 class="section">Folders you ignore</h2><p class="section-sub">Klosti skips these folders and everything inside them, so their rules, skills, hooks and MCP servers do not appear anywhere.</p>${rows||'<p class="muted">None yet.</p>'}${form}`;
 }
+/** Each folder's box lists its projects, and the ones that start unchecked, so this works while the folder is closed. */
+const folderProjects=root=>{try{return JSON.parse(root.dataset.projects||'[]');}catch(e){return[];}};
+const startsOff=root=>{try{return new Set(JSON.parse(root.dataset.off||'[]'));}catch(e){return new Set();}};
+const projectOn=(root,path)=>projectChoices.has(path)?projectChoices.get(path):!startsOff(root).has(path);
+/** Half-filled when only some of a checked folder's projects are on. */
+function refreshFolderBoxes(){
+  document.querySelectorAll('input[name="root"]').forEach(root=>{
+    const all=folderProjects(root),on=all.filter(p=>projectOn(root,p)).length;
+    root.indeterminate=root.checked&&on>0&&on<all.length;
+  });
+}
+/** A folder's box checks or unchecks all its projects. A project's box keeps its folder's box in step. */
+function syncFolderTree(e){
+  const input=e.target;
+  const block=input.closest&&input.closest('.root-block');
+  if(!block||(input.name!=='root'&&input.name!=='project'))return;
+  const root=block.querySelector('input[name="root"]');
+  const all=folderProjects(root);
+  if(input.name==='root'){
+    all.forEach(p=>projectChoices.set(p,root.checked));
+    block.querySelectorAll('input[name="project"]').forEach(p=>{p.checked=root.checked;});
+  }else{
+    projectChoices.set(input.value,input.checked);
+    root.checked=all.some(p=>projectOn(root,p));
+  }
+  refreshFolderBoxes();
+}
+/** Projects under an unchecked folder are not scanned anyway, so they are not added to the ignore list. */
+function uncheckedProjects(){
+  return[...document.querySelectorAll('input[name="root"]:checked')].flatMap(root=>folderProjects(root).filter(p=>!projectOn(root,p)));
+}
+const listedProjects=()=>[...document.querySelectorAll('input[name="root"]')].flatMap(folderProjects);
+
 /** Asks the local engine to open the system folder chooser. Resolves to null when the user cancels. */
 function chooseFolder(token){
   return fetch('/api/pick-folder',{method:'POST',headers:{'Content-Type':'application/json','X-Klosti-Token':token},body:'{}'})
@@ -794,8 +838,11 @@ function welcome(ob){
   const added=[];
   let justOpened=null;
   let entered=false;
+  const THREAD_SWAY_PX=120,THREAD_SWAY_AMP=9;
+  const YARN_BALL=`<svg viewBox="-12 -12 24 24"><clipPath id="welcome-yarn"><circle r="11"/></clipPath><circle r="11"/><g clip-path="url(#welcome-yarn)"><ellipse cx="-2.05" cy="-3.76" rx="14.3" ry="4.95" transform="rotate(-28.6 -2.05 -3.76)"/><ellipse cx=".29" cy=".54" rx="14.3" ry="4.95" transform="rotate(-28.6 .29 .54)"/><ellipse cx="2.64" cy="4.83" rx="14.3" ry="4.95" transform="rotate(-28.6 2.64 4.83)"/><ellipse cx="1.91" cy="-1.52" rx="14.3" ry="4.95" transform="rotate(51.6 1.91 -1.52)"/></g></svg>`;
   const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
   document.querySelector('.app').classList.add('is-welcome');
+  try{sessionStorage.removeItem('rulebook-flash');}catch(e){}
   const choose=()=>chooseFolder((window.KLOSTI_API||{}).token);
   const countUp=()=>document.querySelectorAll('.welcome [data-count]').forEach(el=>{
     const target=Number(el.dataset.count),start=performance.now(),delay=900,duration=700;
@@ -803,28 +850,48 @@ function welcome(ob){
     const tick=now=>{const t=Math.min(Math.max((now-start-delay)/duration,0),1);el.textContent=String(Math.round(target*(1-(1-t)**3)));if(t<1)requestAnimationFrame(tick);};
     requestAnimationFrame(tick);
   });
+  /** One continuous thread through the step beads, swaying like the one on the site. */
+  const traceThread=()=>{
+    const wrap=document.querySelector('.welcome-steps'),path=wrap?.querySelector('.welcome-thread path');
+    if(!path)return;
+    const centers=[...wrap.querySelectorAll('.welcome-bead')].map(b=>{const step=b.parentElement;return[step.offsetLeft+b.offsetLeft+b.offsetWidth/2,step.offsetTop+b.offsetTop+b.offsetHeight/2];});
+    let d=`M${centers[0][0]} ${centers[0][1]}`;
+    for(let i=1;i<centers.length;i++){
+      const[[x0,y0],[x1,y1]]=[centers[i-1],centers[i]];
+      const sways=Math.max(2,Math.round((y1-y0)/THREAD_SWAY_PX));
+      const pts=[[x0,y0]];
+      for(let k=1;k<sways;k++)pts.push([x0+(k%2?THREAD_SWAY_AMP:-THREAD_SWAY_AMP),y0+(y1-y0)*k/sways]);
+      pts.push([x1,y1]);
+      for(let k=1;k<pts.length-1;k++)d+=`Q${pts[k][0]} ${pts[k][1]} ${(pts[k][0]+pts[k+1][0])/2} ${(pts[k][1]+pts[k+1][1])/2}`;
+      d+=`L${x1} ${y1}`;
+    }
+    path.setAttribute('d',d);
+  };
+  new ResizeObserver(traceThread).observe($('page'));
   const shake=()=>{const w=document.querySelector('.welcome');if(!w||calm)return;w.classList.remove('is-shaking');void w.offsetWidth;w.classList.add('is-shaking');};
-  const draw=()=>{
+  let draw=()=>{
     const keep=new Map([...document.querySelectorAll('#page input[type=checkbox]')].map(i=>[`${i.name}|${i.value}`,i.checked]));
     const checked=(key,fallback)=>keep.has(key)?keep.get(key):fallback;
     const anyFound=ob.agents.some(a=>a.found);
     const agents=ob.agents.map(a=>`<label class="agent-card${a.found?'':' is-missing'}" style="--c:var(--${a.name.toLowerCase()},var(--other))"><input type="checkbox" name="agent" value="${a.name}"${checked(`agent|${a.name}`,a.found||!anyFound)?' checked':''}><span class="agent-orb"><i></i></span><span class="agent-meta"><b>${a.name}</b><span class="muted">${a.found?'Found on this Mac':'Not found'}</span></span><span class="agent-tick" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5" pathLength="1"/></svg></span></label>`).join('');
     const folders=[...ob.folders,...added.map(path=>({path,projects:[]}))].map(f=>{
       const open=opened.has(f.path);
-      const rows=f.projects.map((p,i)=>`<label class="setting-row sub" style="--i:${i}"><input type="checkbox" name="project" value="${escape(p)}"${checked(`project|${p}`,true)?' checked':''}><span><b>${escape(p.split('/').pop())}</b></span><span></span></label>`).join('');
-      const toggle=f.projects.length?`<button class="btn-quiet" data-welcome-toggle="${escape(f.path)}" aria-expanded="${open}">${open?'Hide projects':'Show projects'}</button>`:'';
+      const rows=f.projects.map((p,i)=>`<label class="setting-row sub" style="--i:${i}"><input type="checkbox" name="project" value="${escape(p)}"${(projectChoices.has(p)?projectChoices.get(p):true)?' checked':''}><span><b>${escape(p.slice(f.path.length+1))}</b></span><span></span></label>`).join('');
+      const toggle=f.projects.length?`<button class="tree-toggle" data-welcome-toggle="${escape(f.path)}" aria-expanded="${open}" aria-label="${open?'Hide':'Show'} projects in ${escape(tilde(f.path))}"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></button>`:'<span class="tree-toggle-gap"></span>';
       const count=f.projects.length?`<b class="count"${entered?'':` data-count="${f.projects.length}"`}>${f.projects.length}</b> ${f.projects.length===1?'project':'projects'} with agent files`:'No agent files at the top level';
-      return`<div class="root-block"><div class="setting-row root"><label><input type="checkbox" name="root" value="${escape(f.path)}"${checked(`root|${f.path}`,f.projects.length>0||added.includes(f.path))?' checked':''}><span class="path">${escape(tilde(f.path))}</span></label><span class="muted">${count}</span>${toggle}</div>${open?`<div class="sub-list${f.path===justOpened?' is-opening':''}">${rows}</div>`:''}</div>`;
+      return`<div class="root-block"><div class="setting-row root"><label><input type="checkbox" name="root" value="${escape(f.path)}" data-projects="${escape(JSON.stringify(f.projects))}"${checked(`root|${f.path}`,f.projects.length>0||added.includes(f.path))?' checked':''}><span class="path">${escape(tilde(f.path))}</span></label><span class="muted">${count}</span>${toggle}</div>${open?`<div class="sub-list${f.path===justOpened?' is-opening':''}">${rows}</div>`:''}</div>`;
     }).join('');
     const mark=`<svg class="welcome-mark" width="52" height="52" viewBox="0 0 64 64" aria-hidden="true"><mask id="welcome-cut"><rect width="64" height="64" fill="#fff"/><path d="M28 26.5C34 30 46 32 56 28" fill="none" stroke="#000" stroke-width="10.5" stroke-linecap="round"/></mask><g fill="none" stroke="var(--clay)" stroke-width="6.5" stroke-linecap="round"><path pathLength="1" d="M8 48C18 48 26 40 32 30C37 22 42 13 34 12C25 11 22 23 28 26.5" mask="url(#welcome-cut)"/><path class="tail" pathLength="1" d="M28 26.5C34 30 46 32 56 28"/></g></svg>`;
     $('page').innerHTML=`<div class="welcome${entered?'':' enter'}">
-    <div class="welcome-hero">${mark}<span class="welcome-word">klosti</span><span class="welcome-run" aria-hidden="true"></span></div>
+    <div class="welcome-hero">${mark}<span class="welcome-word">klosti</span><svg class="welcome-run" viewBox="0 0 400 18" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 9C40 3 70 15 110 9S180 3 220 9S290 15 330 9S385 5 398 9"/></svg></div>
     <div class="welcome-intro" style="--d:.25s"><h1 class="lede">Welcome to Klosti</h1>
-    <p class="lede-sub">Klosti follows the thread from each coding agent to every rule, skill, hook and MCP server it loads. Two questions first, then it scans. Nothing leaves your Mac.</p></div>
+    <p class="lede-sub">Klosti follows the thread from each coding agent to every rule, skill, hook and MCP server it loads. Two questions first, then it scans. Nothing leaves your computer.</p></div>
+    <div class="welcome-steps"><svg class="welcome-thread" aria-hidden="true"><path pathLength="1"/></svg>
     <section class="welcome-step" style="--d:.45s"><span class="welcome-bead" aria-hidden="true">1</span><h2 class="section">Which agents do you use?</h2><p class="section-sub">The others stay out of every list and out of the AI review. You can change this later in Settings.</p><div class="agent-pick">${agents}</div></section>
     <section class="welcome-step" style="--d:.65s"><span class="welcome-bead" aria-hidden="true">2</span><h2 class="section">Where do you keep your code?</h2><p class="section-sub">Klosti looks for projects in these folders. Uncheck a project to skip it. Your agent settings folders (${escape(ob.agentRoots.map(tilde).join(', ')||'~/.claude and others')}) are always read, because global rules and skills live there.</p><div class="setting-list">${folders}</div>
     <div class="toolbar"><button class="btn-quiet" data-welcome-pick="1">Choose another folder…</button></div></section>
-    <section class="welcome-step" style="--d:.85s"><span class="welcome-bead is-ring" aria-hidden="true"></span><div class="welcome-go"><button class="btn-primary btn-large" data-welcome-go="1">Scan and continue</button><span class="muted" id="welcome-error" role="alert"></span><span class="welcome-progress" aria-hidden="true"></span></div></section></div>`;
+    <section class="welcome-step" style="--d:.85s"><span class="welcome-bead is-ball" aria-hidden="true">${YARN_BALL}</span><div class="welcome-go"><button class="btn-primary btn-large" data-welcome-go="1">Scan and continue</button><span class="muted" id="welcome-error" role="alert"></span><span class="welcome-progress" aria-hidden="true"></span></div></section></div></div>`;
+    traceThread();
     if(!entered&&!calm)countUp();
     entered=true;
     justOpened=null;
@@ -842,7 +909,7 @@ function welcome(ob){
     else if(d.welcomeGo){
       const picked=name=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
       const agents=picked('agent'),roots=picked('root');
-      const ignored=[...document.querySelectorAll('input[name="project"]:not(:checked)')].map(i=>i.value);
+      const ignored=uncheckedProjects();
       const page=document.querySelector('.welcome');
       const fail=msg=>{$('welcome-error').textContent=msg;b.disabled=false;b.textContent='Scan and continue';page.classList.remove('is-scanning');shake();};
       if(!agents.length)return fail('Pick at least one agent.');
@@ -854,6 +921,9 @@ function welcome(ob){
         .catch(err=>fail(err instanceof TypeError?'Klosti is not running. Reopen the app.':err.message));
     }
   });
+  document.addEventListener('change',syncFolderTree);
+  const drawn=draw;
+  draw=()=>{drawn();refreshFolderBoxes();};
   draw();
 }
 
@@ -875,9 +945,9 @@ function settings(){
     const open=state.expandedRoots.has(f);
     const skipped=projects.filter(p=>ignored.has(p)).length;
     const count=projects.length?`${projects.length-skipped} of ${projects.length} projects`:'No projects found yet';
-    const toggle=projects.length?`<button class="btn-quiet" data-toggle-root="${esc(f)}" aria-expanded="${open}">${open?'Hide projects':'Show projects'}</button>`:'';
-    const rows=projects.map(p=>{const rel=short(p).slice(short(f).length+1),name=projectsById.get(p)?.name||p.split('/').pop();return`<label class="setting-row sub"><input type="checkbox" name="project" value="${esc(p)}"${ignored.has(p)?'':' checked'}${dis}><span><b>${esc(name)}</b>${rel!==name?` <span class="path">${esc(rel)}</span>`:''}</span><span class="muted">${ignored.has(p)?'Ignored':''}</span></label>`;}).join('');
-    return`<div class="root-block"><div class="setting-row root"><label><input type="checkbox" name="root" value="${esc(f)}"${roots.has(f)||state.addedRoots.includes(f)?' checked':''}${dis}><span class="path">${esc(short(f))}</span></label><span class="muted">${count}</span>${toggle}</div>${open?`<div class="sub-list">${rows}</div>`:''}</div>`;
+    const toggle=projects.length?`<button class="tree-toggle" data-toggle-root="${esc(f)}" aria-expanded="${open}" aria-label="${open?'Hide':'Show'} projects in ${esc(short(f))}"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></button>`:'<span class="tree-toggle-gap"></span>';
+    const rows=projects.map(p=>{const rel=short(p).slice(short(f).length+1),name=projectsById.get(p)?.name||p.split('/').pop();return`<label class="setting-row sub"><input type="checkbox" name="project" value="${esc(p)}"${(projectChoices.has(p)?projectChoices.get(p):!ignored.has(p))?' checked':''}${dis}><span><b>${esc(name)}</b>${rel!==name?` <span class="path">${esc(rel)}</span>`:''}</span><span class="muted">${ignored.has(p)?'Ignored':''}</span></label>`;}).join('');
+    return`<div class="root-block"><div class="setting-row root"><label><input type="checkbox" name="root" value="${esc(f)}" data-projects="${esc(JSON.stringify(projects))}" data-off="${esc(JSON.stringify(projects.filter(p=>ignored.has(p))))}"${roots.has(f)||state.addedRoots.includes(f)?' checked':''}${dis}><span class="path">${esc(short(f))}</span></label><span class="muted">${count}</span>${toggle}</div>${open?`<div class="sub-list">${rows}</div>`:''}</div>`;
   }).join('');
   const add=API?`<div class="toolbar"><button class="btn-quiet" data-add-root="1">Choose another folder…</button></div>`:'';
   const save=API?`<div class="finding-actions"><button class="btn-primary" data-save-settings="1">Save and scan again</button></div>`:`<p class="muted">To change these, open the app, or edit <code>${esc(short(st.configFile))}</code>.</p>`;
@@ -886,7 +956,8 @@ function settings(){
   <h2 class="section">Folders where you code</h2><p class="section-sub">Klosti looks for projects in these folders. Your agent settings folders (${esc(st.agentRoots.map(short).join(', ')||'~/.claude and others')}) are always scanned, because that is where global rules and skills live.</p><div class="setting-list">${folderRows}</div>${add}
   ${save}
   ${ignoredSection()}
-  <p class="muted" style="font-size:13px;margin-top:28px">Saved in <code>${esc(short(st.configFile))}</code>, shared with <code>npx klosti</code>.</p>`;
+  <p class="muted" style="font-size:13px;margin-top:28px">Saved in <code>${esc(short(st.configFile))}</code>, shared with <code>npx klosti</code>.</p>
+  ${API?`<h2 class="section">Start over</h2><div class="remove-box"><span>Deletes everything Klosti keeps: the scan, AI review results, history, backups of files you edited, and these settings. It all goes to the Trash, so you can put it back. Your rule and skill files are not touched. Then you see the welcome screen again.</span><button class="btn-danger" data-delete-data="1">Delete all data</button></div>`:''}`;
 }
 function changes(){
   return`<h1 class="lede">Changes</h1><p class="lede-sub">One timeline: what you fixed from this page, plus anything the scans noticed on their own, like a new skill or a rule file edited by hand. The watcher rescans when your skill or plugin folders change, and every 3 hours.</p>
@@ -922,14 +993,17 @@ document.addEventListener('click',e=>{
   if(d.view){go(d.view);}
   else if(d.sev){state.sev=d.sev;render();}
   else if(d.cat){state.cat=d.cat;render();}
+  else if(d.deleteData){
+    if(!b.classList.contains('confirming')){b.classList.add('confirming');b.textContent='Click again to delete everything';setTimeout(()=>{if(!b.disabled){b.classList.remove('confirming');b.textContent='Delete all data';}},6000);return;}
+    b.disabled=true;b.textContent='Deleting…';callApi('/api/delete-data',{});
+  }
   else if(d.toggleRoot){const f=d.toggleRoot;rememberChecks();state.expandedRoots.has(f)?state.expandedRoots.delete(f):state.expandedRoots.add(f);render();restoreChecks();}
   else if(d.addRoot){b.disabled=true;chooseFolder(API.token).then(path=>{b.disabled=false;if(!path)return;rememberChecks();if(!state.addedRoots.includes(path)&&!(D.settings?.candidates||[]).includes(path))state.addedRoots.push(path);render();restoreChecks();}).catch(err=>{b.disabled=false;showToast(err.message,null);});}
   else if(d.saveSettings){
     const picked=name=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
     const agents=picked('agent'),roots=picked('root');
-    const shownProjects=[...document.querySelectorAll('input[name="project"]')].map(i=>i.value);
-    const unchecked=[...document.querySelectorAll('input[name="project"]:not(:checked)')].map(i=>i.value);
-    const ignored=[...(D.ignored||[]).filter(p=>!shownProjects.includes(p)),...unchecked];
+    const listed=listedProjects();
+    const ignored=[...(D.ignored||[]).filter(p=>!listed.includes(p)),...uncheckedProjects()];
     if(!agents.length){showToast('Pick at least one agent.',null);return;}
     if(!roots.length){showToast('Pick at least one folder.',null);return;}
     b.disabled=true;b.textContent='Scanning…';callApi('/api/settings',{roots,agents,ignored});
@@ -959,6 +1033,7 @@ document.addEventListener('click',e=>{
   else if(d.invScope){state.invScope=d.invScope;render();}
   else if(d.expand){state.expanded.add(d.expand);render();}
 });
+document.addEventListener('change',syncFolderTree);
 document.addEventListener('change',e=>{if(e.target.id==='lens-project'){state.lensProject=e.target.value;render();}});
 document.addEventListener('input',e=>{
   const field={q:'query'}[e.target.id];
@@ -986,7 +1061,7 @@ async function callApi(path,body){
     showToast(msg,null);
     document.querySelectorAll('.line-confirm').forEach(el=>el.remove());
     document.querySelectorAll('.btn-danger:disabled').forEach(b=>{b.disabled=false;b.classList.remove('confirming');b.textContent='Try again';});
-    document.querySelectorAll('[data-ignore-folder]:disabled,[data-unignore-folder]:disabled,[data-ignore-input]:disabled,[data-save-settings]:disabled').forEach(b=>{b.disabled=false;});
+    document.querySelectorAll('[data-ignore-folder]:disabled,[data-unignore-folder]:disabled,[data-ignore-input]:disabled,[data-save-settings]:disabled,[data-delete-data]:disabled').forEach(b=>{b.disabled=false;});
   }
 }
 async function proposeFix(findingId,button){

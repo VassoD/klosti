@@ -122,7 +122,9 @@ export const CONFIG_PATH = CONFIG_FILE;
 
 /** Where each agent keeps its user-wide settings. A folder that exists means the agent is probably installed. */
 const AGENT_HOMES: Record<string, string> = { Claude: '.claude', Codex: '.codex', Cursor: '.cursor', Gemini: '.gemini' };
-/** Files or folders that mark a project as having agent instructions, checked one level down only. */
+/** How far below a code folder the welcome screen looks for projects, for layouts like code/client/repo. */
+const PROJECT_SEARCH_DEPTH = 4;
+/** Files or folders that mark a project as having agent instructions. */
 const PROJECT_MARKERS = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md', '.claude', '.agents', '.cursor', '.cursorrules', '.codex'];
 
 export interface OnboardingChoices {
@@ -134,13 +136,20 @@ export interface OnboardingChoices {
 /** A quick look, without a full scan, so the welcome screen can suggest agents and folders. */
 export function onboardingChoices(config: ResolvedConfig): OnboardingChoices {
   const projectsIn = (root: string): string[] => {
-    try {
-      return readdirSync(root, { withFileTypes: true })
-        .filter(e => e.isDirectory() && !e.name.startsWith('.') && !EXCLUDED_DIRS.includes(e.name))
-        .map(e => join(root, e.name))
-        .filter(dir => PROJECT_MARKERS.some(m => existsSync(join(dir, m))))
-        .sort((a, b) => a.localeCompare(b));
-    } catch { return []; }
+    const found: string[] = [];
+    const walk = (dir: string, depth: number): void => {
+      let entries;
+      try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.') || EXCLUDED_DIRS.includes(entry.name)) continue;
+        const child = join(dir, entry.name);
+        // A project ends the search on its branch; otherwise look deeper, like the scanner does.
+        if (PROJECT_MARKERS.some(m => existsSync(join(child, m)))) found.push(child);
+        else if (depth < PROJECT_SEARCH_DEPTH) walk(child, depth + 1);
+      }
+    };
+    walk(root, 1);
+    return found.sort((a, b) => a.localeCompare(b));
   };
   return {
     agents: KNOWN_AGENTS.map(name => ({ name, found: existsSync(join(HOME, AGENT_HOMES[name] ?? '')) })),
