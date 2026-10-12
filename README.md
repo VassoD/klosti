@@ -31,7 +31,7 @@ The app keeps running in the menu bar when its window is closed. The menu bar ic
 
 ## Privacy
 
-Everything stays on your machine except what the AI features send to Claude (through your Claude Code, or your Anthropic API key). MCP entries keep only the server name, transport and host. Hook commands are shown with anything that looks like a credential masked. The app's data folder contains your instruction text.
+Everything stays on your machine except what the AI features send to Claude (through your Claude Code, or your Anthropic API key). MCP entries keep only the server name, transport and host. Hook commands are shown with anything that looks like a credential masked. Skill history comes from Claude Code's session logs; only skill names, dates, project folders and the paths of files written or edited are kept, never the conversation. The app's data folder contains your instruction text.
 
 ## License
 

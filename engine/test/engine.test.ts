@@ -6,6 +6,7 @@ import { after, before, describe, it } from 'node:test';
 import { ActionRefused, backUp, locateLine, restore } from '../src/actions.ts';
 import { analyze } from '../src/analyze.ts';
 import { verbatim } from '../src/review.ts';
+import { usesInLog } from '../src/usage.ts';
 import { EXCLUDED_DIRS, type ResolvedConfig } from '../src/config.ts';
 import { frontmatter, redact, scan } from '../src/scan.ts';
 import { Store } from '../src/store.ts';
@@ -63,6 +64,28 @@ describe('verbatim', () => {
   it('should keep quoted instructions and drop paraphrases', () => {
     const body = '# Ship\n- **Always** commit after each step\n- Run the tests first\n';
     assert.deepEqual(verbatim(body, ['Always commit after each step', 'Commit often', 'Run the tests first', 'Run the tests first']), ['Always commit after each step', 'Run the tests first']);
+  });
+});
+
+describe('usesInLog', () => {
+  const line = (entry: object): string => JSON.stringify({ sessionId: 's1', cwd: '/code/app', timestamp: '2026-10-01T10:00:00Z', ...entry });
+  const tool = (name: string, input: object): string => line({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } });
+
+  it('should credit files written after a skill to that skill, and skip built-in commands', () => {
+    const log = [
+      tool('Write', { file_path: '/code/app/before.ts', content: 'secret text' }),
+      tool('Skill', { skill: 'writing-plans', args: 'private request' }),
+      tool('Write', { file_path: '/code/app/plan.md', content: 'x' }),
+      tool('Edit', { file_path: '/code/app/plan.md', old_string: 'a', new_string: 'b' }),
+      line({ type: 'user', message: { content: '<command-name>/model</command-name>' } }),
+      tool('Edit', { file_path: '/code/app/src.ts', old_string: 'a', new_string: 'b' }),
+      line({ type: 'user', message: { content: '<command-name>/deploy</command-name>' } }),
+      tool('Write', { file_path: '/code/app/out.txt', content: 'x' }),
+    ].join('\n');
+    const uses = usesInLog(log);
+    assert.deepEqual(uses.map(u => [u.skill, u.by]), [['writing-plans', 'claude'], ['deploy', 'you']]);
+    assert.deepEqual(uses[0]?.files, [{ path: '/code/app/plan.md', action: 'wrote' }, { path: '/code/app/src.ts', action: 'edited' }]);
+    assert.ok(!JSON.stringify(uses).includes('secret') && !JSON.stringify(uses).includes('private'), 'no message or file text is kept');
   });
 });
 
