@@ -168,6 +168,14 @@ export function pickFolder(prompt: string): Promise<string | null> {
   });
 }
 
+/** Opens a web page in the default browser. The desktop window would otherwise open it inside the app. */
+export function openInBrowser(url: string): void {
+  if (!/^https:\/\/[^\s]+$/i.test(url)) throw new ActionRefused('Only https links can be opened.');
+  const os = platform();
+  const [command, args] = os === 'darwin' ? ['open', [url]] : os === 'win32' ? ['explorer', [url]] : ['xdg-open', [url]];
+  spawn(command, args as string[], { stdio: 'ignore', detached: true }).unref();
+}
+
 // ---- rescan without losing the AI review --------------------------------------------
 
 type ConflictEdit = (conflict: RuleConflict) => RuleConflict;

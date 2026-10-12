@@ -968,11 +968,19 @@ function changes(){
 }
 
 const WHAT={rule:'Standing instructions loaded into every session where it applies.',skill:'Know-how the agent loads when a request matches its description, or when you call it by name.',command:'A prompt you run by typing its name after a slash.',subagent:'A helper the agent can hand work to. It runs in its own context.',hook:'A script that runs automatically on an event. The model does not decide.',mcp:'A server that gives the agent extra tools.','output-style':'Changes tone and format for a whole session.'};
+const GITHUB_REPO=/^[\w.-]+\/[\w.-]+$/;
+/** Where a skill or plugin item is published: the plugin's homepage, the repo an npx skills pack came from, or claude.ai. */
+function sourceUrl(t){
+  if(t.plugin){const p=(D.plugins||[]).find(x=>x.id===t.plugin);if(p?.homepage)return p.homepage;}
+  if(t.origin&&GITHUB_REPO.test(t.origin))return`https://github.com/${t.origin}`;
+  if(t.source==='synced')return'https://claude.ai/settings/capabilities';
+  return'';
+}
 function showThing(id){
   const t=byId.get(id);if(!t)return;
   const fs=findingsFor(id);
   const pack=['skill','command','subagent'].includes(t.kind)?packOf(t):null;
-  const facts=[['Where it applies',esc(scopeSentence(t))],['Agents',t.agents.length?agentList(t.agents):'None detected'],pack&&['Came from',esc(pack.name)+(t.version?` <span class="muted">version ${esc(t.version)}</span>`:'')],t.kind==='hook'&&['Event',esc(t.event)+(t.matcher?` <span class="muted">for tools matching ${esc(t.matcher)}</span>`:'')],t.kind==='mcp'&&['Connection',`${esc(t.transport)}, ${esc(t.target)}`],t.kind==='mcp'&&['Scope',esc(t.mcpScope)],t.manualOnly&&['Invocation','Manual only. The model will not load it on its own.'],t.firstSeen&&['First seen',dateLabel(t.firstSeen)+(t.changedAt?`, updated ${dateLabel(t.changedAt)}`:'')]].filter(Boolean);
+  const facts=[['Where it applies',esc(scopeSentence(t))],['Agents',t.agents.length?agentList(t.agents):'None detected'],pack&&['Came from',esc(pack.name)+(t.version?` <span class="muted">version ${esc(t.version)}</span>`:'')],sourceUrl(t)&&['Website',`<a href="${esc(sourceUrl(t))}" data-open-url="${esc(sourceUrl(t))}" target="_blank" rel="noopener">${esc(sourceUrl(t).replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`],t.kind==='hook'&&['Event',esc(t.event)+(t.matcher?` <span class="muted">for tools matching ${esc(t.matcher)}</span>`:'')],t.kind==='mcp'&&['Connection',`${esc(t.transport)}, ${esc(t.target)}`],t.kind==='mcp'&&['Scope',esc(t.mcpScope)],t.manualOnly&&['Invocation','Manual only. The model will not load it on its own.'],t.firstSeen&&['First seen',dateLabel(t.firstSeen)+(t.changedAt?`, updated ${dateLabel(t.changedAt)}`:'')]].filter(Boolean);
   const locs=(t.locations||[]).map(l=>{
     const removeLabel=l.linkTarget?'Remove link':'Move to Trash';
     const who=(t.locations.length>1&&l.agents?.length)?` <span class="muted">for ${esc(l.agents.join(' and '))}</span>`:'';
@@ -1032,6 +1040,14 @@ document.addEventListener('click',e=>{
   else if(d.invAgent){state.invAgent=d.invAgent;render();}
   else if(d.invScope){state.invScope=d.invScope;render();}
   else if(d.expand){state.expanded.add(d.expand);render();}
+});
+document.addEventListener('click',e=>{
+  const link=e.target.closest&&e.target.closest('a[data-open-url]');
+  if(!link||!API)return;
+  e.preventDefault();
+  fetch('/api/open-url',{method:'POST',headers:{'Content-Type':'application/json','X-Klosti-Token':API.token},body:JSON.stringify({path:link.dataset.openUrl})})
+    .then(r=>{if(!r.ok)return r.json().then(j=>showToast(j.error||'That link could not be opened.',null));})
+    .catch(()=>showToast('Klosti is not running. Reopen the app.',null));
 });
 document.addEventListener('change',syncFolderTree);
 document.addEventListener('change',e=>{if(e.target.id==='lens-project'){state.lensProject=e.target.value;render();}});

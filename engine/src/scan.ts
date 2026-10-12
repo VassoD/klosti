@@ -16,6 +16,7 @@ const HOOK_COMMAND_CHARS = 280;
 const IMPORT_ROUNDS = 4;
 const CLAUDE_JSON = join(HOME, '.claude.json');
 const CLAUDE_INSTALLED_PLUGINS = join(HOME, '.claude', 'plugins', 'installed_plugins.json');
+const CLAUDE_MARKETPLACES = join(HOME, '.claude', 'plugins', 'known_marketplaces.json');
 const CLAUDE_SETTINGS = join(HOME, '.claude', 'settings.json');
 const CODEX_CONFIG = join(HOME, '.codex', 'config.toml');
 const CODEX_PLUGIN_CACHE = join(HOME, '.codex', 'plugins', 'cache');
@@ -206,6 +207,27 @@ interface PluginRoot {
   root: string;
   version: string | null;
   installedAt: string | null;
+  /** Where the plugin is published: its homepage or repository, else its marketplace's repository. */
+  homepage: string | null;
+}
+
+/** Only web links are kept, so a manifest cannot smuggle in a file: or javascript: URL. */
+const webUrl = (value: unknown): string | null => {
+  const text = asString(value)?.trim() ?? '';
+  return /^https?:\/\/[^\s]+$/i.test(text) ? text : null;
+};
+
+function pluginHomepage(root: string, id: string, marketplaces: Record<string, unknown>, errors: string[]): string | null {
+  for (const manifest of [join(root, '.claude-plugin', 'plugin.json'), join(root, '.codex-plugin', 'plugin.json')]) {
+    if (!existsSync(manifest)) continue;
+    const data = readJson(manifest, errors);
+    const repository = asRecord(data.repository);
+    const link = webUrl(data.homepage) ?? webUrl(data.repository) ?? webUrl(repository.url);
+    if (link) return link;
+  }
+  const source = asRecord(asRecord(marketplaces[id.split('@')[1] ?? '']).source);
+  const repo = asString(source.repo);
+  return source.source === 'github' && repo && /^[\w.-]+\/[\w.-]+$/.test(repo) ? `https://github.com/${repo}` : webUrl(source.url);
 }
 
 function skillRecord(path: string, excluded: Set<string>, plugin: PluginRoot | null, origins: Map<string, string>): FileRecord {
@@ -267,11 +289,12 @@ function enabledPlugins(errors: string[]): PluginRoot[] {
   const plugins: PluginRoot[] = [];
   const installed = existsSync(CLAUDE_INSTALLED_PLUGINS) ? asRecord(readJson(CLAUDE_INSTALLED_PLUGINS, errors).plugins) : {};
   const enabled = existsSync(CLAUDE_SETTINGS) ? asRecord(readJson(CLAUDE_SETTINGS, errors).enabledPlugins) : {};
+  const marketplaces = existsSync(CLAUDE_MARKETPLACES) ? readJson(CLAUDE_MARKETPLACES, errors) : {};
   for (const [id, entries] of Object.entries(installed)) {
     if (!enabled[id] || !Array.isArray(entries)) continue;
     for (const entry of entries.map(asRecord)) {
       const root = asString(entry.installPath);
-      if (root) plugins.push({ id, agent: 'Claude', root, version: asString(entry.version), installedAt: asString(entry.installedAt) });
+      if (root) plugins.push({ id, agent: 'Claude', root, version: asString(entry.version), installedAt: asString(entry.installedAt), homepage: pluginHomepage(root, id, marketplaces, errors) });
     }
   }
   const config = existsSync(CODEX_CONFIG) ? readToml(CODEX_CONFIG, errors) : {};
@@ -279,7 +302,7 @@ function enabledPlugins(errors: string[]): PluginRoot[] {
     if (asRecord(settings).enabled !== true || !id.includes('@')) continue;
     const [name, marketplace] = id.split('@', 2) as [string, string];
     const root = latestChild(join(CODEX_PLUGIN_CACHE, marketplace, name));
-    if (root) plugins.push({ id, agent: 'Codex', root, version: basename(root), installedAt: null });
+    if (root) plugins.push({ id, agent: 'Codex', root, version: basename(root), installedAt: null, homepage: pluginHomepage(root, id, {}, errors) });
   }
   return plugins;
 }
@@ -489,7 +512,7 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   const changes = trackChanges(previous, [...items, ...allExtras(extras)], now);
   let history = previous.history ?? [];
   if (changes.added.length || changes.removed.length || changes.changed.length) history = [...history, { at: now, ...changes }].slice(-HISTORY_LIMIT);
-  const installed: InstalledPlugin[] = plugins.map(p => ({ id: p.id, agent: p.agent, version: p.version, path: p.root, installedAt: p.installedAt }));
+  const installed: InstalledPlugin[] = plugins.map(p => ({ id: p.id, agent: p.agent, version: p.version, path: p.root, installedAt: p.installedAt, homepage: p.homepage }));
   const inventory: Inventory = {
     scannedAt: now, baselineAt: previous.extrasTracked && previous.baselineAt ? previous.baselineAt : now, extrasTracked: true,
     roots, excluded: config.excluded, ignored: config.ignored, errors, files: items, extras, primaryFileCount: files.length, skillCount: skills.length,
