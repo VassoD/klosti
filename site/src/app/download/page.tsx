@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { AutoDownload } from "@/landing/AutoDownload";
 import { InstallSteps } from "@/landing/InstallSteps";
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default function DownloadPage(): React.JSX.Element {
+  if (!MAC_DOWNLOAD_URL) notFound();
   return (
     <>
       <SiteHeader />

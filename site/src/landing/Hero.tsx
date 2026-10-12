@@ -1,5 +1,4 @@
-import { DownloadButton } from "@/landing/DownloadButton";
-import { PLATFORM_NOTE } from "@/landing/links";
+import { GetKlosti } from "@/landing/GetKlosti";
 
 export function Hero(): React.JSX.Element {
   return (
@@ -12,13 +11,10 @@ export function Hero(): React.JSX.Element {
       </h1>
       <p className="lead">
         Claude Code, Codex, Cursor and Gemini each read their own rules, skills, hooks and MCP servers, from folders all
-        over your Mac. Klosti maps all of it, shows what each agent sees in each project, and tells you where your
+        over your machine. Klosti maps all of it, shows what each agent sees in each project, and tells you where your
         instructions contradict each other.
       </p>
-      <div className="ctas">
-        <DownloadButton />
-      </div>
-      <p className="fine">{PLATFORM_NOTE}</p>
+      <GetKlosti />
     </div>
   );
 }

@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "node ../brand/sync.mjs && node scripts/copy-dmg.mjs",
+    "predev": "node ../brand/sync.mjs",
     "dev": "next dev",
-    "prebuild": "node ../brand/sync.mjs --check && node scripts/copy-dmg.mjs --strict",
+    "prebuild": "node ../brand/sync.mjs --check",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\""
