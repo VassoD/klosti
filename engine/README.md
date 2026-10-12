@@ -9,7 +9,7 @@ npx klosti review     # AI review of overlaps and contradictions
 npx klosti build -o klosti.html   # standalone page
 ```
 
-Requires Node 20 or later. Everything runs locally. The scanner never copies MCP environment variables, headers or arguments, and masks anything that looks like a credential in hook commands.
+Requires Node 20 or later. Everything runs locally. The scanner never copies MCP environment variables, headers or arguments, and masks anything that looks like a credential in hook commands. For skill history it reads Claude Code's session logs in `~/.claude/projects`, keeping only skill names, dates, the project folder and the paths of files written or edited, never the conversation.
 
 ## What it scans
 

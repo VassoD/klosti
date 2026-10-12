@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { aiAvailability } from './ai.ts';
 import { CONFIG_PATH, rootCandidates, type ResolvedConfig } from './config.ts';
 import type { Store } from './store.ts';
+import { refreshUsage, summarizeUsage, type SkillUsage } from './usage.ts';
 import type { Analysis, Inventory } from './types.ts';
 
 /** The desktop app passes the bundled template's path; the npm package finds it next to the code. */
@@ -11,6 +12,11 @@ const templatePath = (): string => process.env.KLOSTI_TEMPLATE ?? join(dirname(f
 
 export interface PagePayload extends Record<string, unknown> {
   review: { done: number; total: number; lastAt: string | null };
+}
+
+/** Skill history from Claude Code's session logs. A failure here should never stop the page from loading. */
+function usageSafely(store: Store): Record<string, SkillUsage> {
+  try { return summarizeUsage(refreshUsage(store)); } catch { return {}; }
 }
 
 export function payload(store: Store, analysis: Analysis, config: ResolvedConfig): PagePayload {
@@ -25,6 +31,7 @@ export function payload(store: Store, analysis: Analysis, config: ResolvedConfig
     things: analysis.things, projects: analysis.projects, findings: analysis.findings, budgets: analysis.budgets,
     review: { done, total: contexts.length + stacks.length + istacks.length, lastAt: dates.at(-1) ?? null },
     ai: aiAvailability(),
+    usage: usageSafely(store),
     settings: { agents: config.agents, roots: config.codeRoots, candidates: rootCandidates(config), agentRoots: config.agentRoots, configFile: CONFIG_PATH },
     history: inventory.history ?? [], actions: store.actions(), plugins: inventory.plugins ?? [], memories: inventory.memories ?? [],
     scannedAt: inventory.scannedAt, baselineAt: inventory.baselineAt ?? inventory.scannedAt, roots: inventory.roots ?? [], excluded: inventory.excluded ?? [], ignored: inventory.ignored ?? [], limits: inventory.limits ?? [], errors: inventory.errors ?? [],

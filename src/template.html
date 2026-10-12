@@ -311,6 +311,15 @@ table.wins{width:100%;border-collapse:collapse;font-size:14px;background:var(--c
 .reco li{margin:6px 0}
 .reco pre{background:var(--paper-2);border-radius:var(--radius-sm);padding:8px 10px;font:12.5px/1.6 var(--mono);margin:6px 0;white-space:pre-wrap}
 .fixes{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.uses>li{padding:12px 14px}
+.use-head{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;font-size:14px}
+.use-head .muted{font-size:13px}
+.use-files{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.use-files li{display:flex;gap:10px;align-items:baseline;min-width:0}
+.use-files .path{overflow-wrap:anywhere}
+.use-action{flex:none;font-size:12px;border-radius:4px;padding:1px 6px;background:var(--paper-2);color:var(--ink-2)}
+.use-action.wrote{background:var(--ok-soft);color:var(--ok)}
+.use-none{font-size:13px;margin:6px 0 0}
 .fixes>li{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px 18px}
 .fix-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
 .fix-head b{font:600 15px/1.35 var(--serif)}
@@ -968,6 +977,32 @@ function changes(){
 }
 
 const WHAT={rule:'Standing instructions loaded into every session where it applies.',skill:'Know-how the agent loads when a request matches its description, or when you call it by name.',command:'A prompt you run by typing its name after a slash.',subagent:'A helper the agent can hand work to. It runs in its own context.',hook:'A script that runs automatically on an event. The model does not decide.',mcp:'A server that gives the agent extra tools.','output-style':'Changes tone and format for a whole session.'};
+/** Uses recorded under any name the sessions may have used: "name", or "plugin:name" for plugin skills. */
+function usageFor(t){
+  const keys=[t.name];
+  if(t.plugin)keys.push(`${t.plugin.split('@')[0]}:${t.name}`);
+  const found=keys.map(k=>(D.usage||{})[k]).filter(Boolean);
+  if(!found.length)return null;
+  const recent=found.flatMap(u=>u.recent).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,USES_SHOWN);
+  return{count:found.reduce((n,u)=>n+u.count,0),recent};
+}
+const USES_SHOWN=15;
+const projectNameOf=cwd=>{if(!cwd)return'';const p=D.projects.filter(x=>cwd===x.id||cwd.startsWith(x.id+'/')).sort((a,b)=>b.id.length-a.id.length)[0];return p?p.name:short(cwd);};
+/** When a skill was used and which files the session wrote or edited afterwards, from Claude Code's session logs. */
+function skillHistory(t){
+  if(!['skill','command'].includes(t.kind)||!t.agents.includes('Claude'))return'';
+  const usage=usageFor(t);
+  const note='From your Claude Code session logs, which keep about 30 days by default. Files are the ones the session wrote or edited after the skill started, until another skill took over, so a long session can list work the skill did not shape. Only names, dates and file paths are read.';
+  if(!usage)return`<h4>Used</h4><p class="muted">No recorded use. ${note}</p>`;
+  const rows=usage.recent.map(u=>{
+    const where=projectNameOf(u.cwd);
+    const who=u.by==='you'?`you typed /${esc(u.skill.split(':').pop())}`:'Claude picked it';
+    const rel=p=>u.cwd&&p.startsWith(u.cwd+'/')?p.slice(u.cwd.length+1):short(p);
+    const files=u.files.length?`<ul class="use-files">${u.files.map(f=>`<li><span class="use-action ${f.action}">${f.action==='wrote'?'Wrote':'Edited'}</span><span class="path">${esc(rel(f.path))}</span></li>`).join('')}</ul>`:'<p class="muted use-none">No files written or edited.</p>';
+    return`<li><div class="use-head"><b>${whenLabel(u.at)}</b><span class="muted">${where?`in ${esc(where)}, `:''}${who}</span></div>${files}</li>`;
+  }).join('');
+  return`<h4>Used ${usage.count} ${usage.count===1?'time':'times'}</h4><p class="muted" style="font-size:13px;margin:0 0 10px">${note}${usage.count>USES_SHOWN?` Showing the latest ${USES_SHOWN}.`:''}</p><ul class="fixes uses">${rows}</ul>`;
+}
 const GITHUB_REPO=/^[\w.-]+\/[\w.-]+$/;
 /** Where a skill or plugin item is published: the plugin's homepage, the repo an npx skills pack came from, or claude.ai. */
 function sourceUrl(t){
@@ -990,7 +1025,7 @@ function showThing(id){
   const issues=fs.length?`<h4>Issues</h4><div class="findings">${fs.map(f=>findingCard(f,true)).join('')}</div>`:'';
   const body=t.kind==='hook'?`<h4>Command</h4><code class="cmd">${esc(t.command)}</code>`:t.body?`<h4>${t.kind==='rule'?'Full text':'Instructions'}</h4><div class="markdown">${md(t.body)}</div>`:'';
   $('drawer-kind').textContent=cap(KIND[t.kind].one);
-  $('drawer-body').innerHTML=`<div class="agents">${isNew(t)?'<span class="badge-new">New</span>':''}${scopeChip(t)}</div><h2 id="drawer-title">${esc(t.kind==='rule'?t.title:t.name)}</h2><p class="what">${esc(t.description&&t.kind!=='mcp'?t.description:WHAT[t.kind])}</p><dl class="facts">${facts.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}<dt>${(t.locations||[]).length>1?'Files':'File'}</dt><dd>${locs}</dd></dl>${removalNote(t)}${issues}${body}`;
+  $('drawer-body').innerHTML=`<div class="agents">${isNew(t)?'<span class="badge-new">New</span>':''}${scopeChip(t)}</div><h2 id="drawer-title">${esc(t.kind==='rule'?t.title:t.name)}</h2><p class="what">${esc(t.description&&t.kind!=='mcp'?t.description:WHAT[t.kind])}</p><dl class="facts">${facts.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}<dt>${(t.locations||[]).length>1?'Files':'File'}</dt><dd>${locs}</dd></dl>${removalNote(t)}${issues}${skillHistory(t)}${body}`;
   if(!$('drawer').open)$('drawer').showModal();
   $('drawer').scrollTop=0;
 }
