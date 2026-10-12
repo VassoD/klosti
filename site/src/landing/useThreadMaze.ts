@@ -6,7 +6,11 @@ import { drawMaze, MAZE_SIDE_ROOM_PX, type MazeColors } from "@/landing/draw-maz
 import { buildMaze, type Maze } from "@/landing/maze";
 
 const SEED = 7;
-const ROWS = 9;
+/** The maze grows to fill the first screen, within these bounds, so it is seen whole on arrival. */
+const MIN_ROWS = 5;
+const MAX_ROWS = 9;
+/** Room kept below the maze for its caption. */
+const CAPTION_ROOM_PX = 44;
 const MIN_CELL_PX = 26;
 const MIN_COLS = 10;
 const THREAD_MS = 2600;
@@ -46,9 +50,12 @@ export function useThreadMaze(): React.RefObject<HTMLCanvasElement | null> {
       const width = canvas.clientWidth;
       const mazeWidth = width - MAZE_SIDE_ROOM_PX * 2;
       const cols = Math.max(MIN_COLS, Math.floor(mazeWidth / MIN_CELL_PX));
-      if (maze?.cols !== cols) maze = buildMaze(cols, ROWS, SEED + cols);
       cell = mazeWidth / cols;
-      const height = ROWS * cell + EDGE_PAD_PX * 2;
+      const pageTop = canvas.getBoundingClientRect().top + window.scrollY;
+      const roomBelowHero = window.innerHeight - pageTop - CAPTION_ROOM_PX - EDGE_PAD_PX * 2;
+      const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, Math.floor(roomBelowHero / cell)));
+      if (maze?.cols !== cols || maze.rows !== rows) maze = buildMaze(cols, rows, SEED + cols);
+      const height = rows * cell + EDGE_PAD_PX * 2;
       const ratio = window.devicePixelRatio || 1;
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
