@@ -1,6 +1,6 @@
 {
   "name": "klosti",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "See every rule, skill, hook and MCP server your coding agents use, where each applies, and what contradicts.",
   "keywords": [
     "claude-code",
