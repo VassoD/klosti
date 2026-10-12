@@ -37,6 +37,7 @@ export class KlostiServer {
   /** Bumped on every rescan so open pages know to reload. */
   private version = Date.now();
   private busy: Promise<unknown> = Promise.resolve();
+  private reviewing = false;
   /** The real port, which differs from options.port when 0 asked the OS for a free one. */
   private port = 0;
 
@@ -144,18 +145,28 @@ export class KlostiServer {
       case '/api/undo': return this.serialize(() => changed({ ...a.undo(body.backups ?? (body.backup ? [body.backup] : []), body.open ?? undefined) }));
       case '/api/trash': return this.serialize(() => changed({ ...a.trash(body.id ?? '', body.path ?? '') }));
       case '/api/pick-folder': { const path = await pickFolder('Choose a folder where you keep code'); return path ? { path } : { cancelled: true }; }
+      case '/api/delete-data':
+        if (this.reviewing) throw new ActionRefused('Wait for the AI review to finish first.');
+        return this.serialize(() => changed({ ...a.deleteAllData() }));
       case '/api/onboard': return this.serialize(() => changed({ ...a.onboard(body.roots ?? [], body.agents ?? [], body.ignored ?? []) }));
       case '/api/settings': return this.serialize(() => changed({ ...a.saveSettings(body.roots ?? [], body.agents ?? [], body.ignored) }));
       case '/api/ignore-folder': return this.serialize(() => changed({ ...a.ignoreFolder(body.path ?? '', body.ignore ?? true) }));
       case '/api/disable-plugin': return this.serialize(() => changed({ ...a.disablePlugin(body.id ?? '') }));
       case '/api/rescan': return this.serialize(() => { rescan(this.store, this.config); return changed({ message: 'Scanned again.' }); });
-      case '/api/review': return this.serialize(async () => {
+      case '/api/review': {
+        // Not queued with file changes: a review takes minutes and only writes its own cache, in synchronous steps.
+        if (this.reviewing) throw new ActionRefused('A review is already running.');
         const plan = planReview(a.current(), this.store, body.force ?? false, this.config.agents);
         if (!plan.jobs.length) return { message: 'Everything is already reviewed.' };
-        const result = await runReview(plan, this.store);
-        const cost = result.costUsd ? ` About $${result.costUsd.toFixed(2)} at list price.` : '';
-        return changed({ message: `Reviewed ${result.reviewed} of ${plan.jobs.length} places.${result.failed.length ? ` ${result.failed.length} failed.` : ''}${cost}` });
-      });
+        this.reviewing = true;
+        try {
+          const result = await runReview(plan, this.store);
+          const cost = result.costUsd ? ` About $${result.costUsd.toFixed(2)} at list price.` : '';
+          return changed({ message: `Reviewed ${result.reviewed} of ${plan.jobs.length} places.${result.failed.length ? ` ${result.failed.length} failed.` : ''}${cost}` });
+        } finally {
+          this.reviewing = false;
+        }
+      }
       default: return null;
     }
   }

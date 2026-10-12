@@ -6,7 +6,7 @@ import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { z } from 'zod';
 import { askClaude } from './ai.ts';
 import { analyze, short } from './analyze.ts';
-import { AGENT_DIRS, expandPath, HOME, KNOWN_AGENTS, saveIgnored, saveUserSettings, type ResolvedConfig } from './config.ts';
+import { AGENT_DIRS, CONFIG_PATH, DEFAULT_CODE_DIRS, expandPath, HOME, KNOWN_AGENTS, saveIgnored, saveUserSettings, type ResolvedConfig } from './config.ts';
 import { nowIso, posix, scan } from './scan.ts';
 import type { Store } from './store.ts';
 import type { Analysis, Finding, Inventory, Judgements, Quote, RuleConflict, Thing } from './types.ts';
@@ -412,6 +412,21 @@ Rules for your answer:
     saveUserSettings({ onboarded: true });
     this.config.onboarded = true;
     return { message: 'All set. This is everything your agents can see.' };
+  }
+
+  /**
+   * Starts over: the data folder (scan, AI review, history, backups) and the settings file go to the Trash,
+   * so they can still be put back. Rule and skill files are never touched.
+   */
+  deleteAllData(): ActionReply {
+    for (const path of [this.store.dir, CONFIG_PATH]) if (existsSync(path)) moveToTrash(path);
+    mkdirSync(this.store.dir, { recursive: true });
+    this.proposals.clear();
+    this.config.codeRoots.splice(0, this.config.codeRoots.length, ...DEFAULT_CODE_DIRS.map(d => join(HOME, d)).filter(p => existsSync(p)));
+    this.config.ignored.splice(0);
+    this.config.agents.splice(0);
+    this.config.onboarded = false;
+    return { message: 'Deleted. Everything is in the Trash if you change your mind.' };
   }
 
   disablePlugin(thingId: string): ActionReply {
