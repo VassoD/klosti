@@ -707,17 +707,17 @@ function guide(){
   <div class="kinds"><article class="kind"><h3>Plugins<span>${D.plugins.length} enabled</span></h3><p>A package that can contain skills, commands, subagents, hooks and MCP servers. You install it from a marketplace and turn it on or off as one unit. Plugin skills are named <code>plugin:skill</code>, so they never clash with yours by name, but they can still overlap in purpose.</p></article>
   <article class="kind"><h3>Skill packs<span>${D.things.filter(t=>t.origin&&!t.plugin).length} skills</span></h3><p>A set of skills from one repository, copied into a project with the skills CLI and listed in <code>skills-lock.json</code>. <strong>Superpowers</strong> (obra/superpowers) is one: a full development method (brainstorm, write a plan, test first, review) as skills. Its <code>using-superpowers</code> skill tells the agent to look for a skill before every reply, which changes its behaviour noticeably.</p></article></div>
   ${rulesFilesSection()}
-  <h2 class="section">Who wins when things collide</h2><p class="section-sub">From the Claude Code and Codex documentation. Where the docs say nothing, so does this table.</p>
-  <div class="table-wrap"><table class="wins"><thead><tr><th>Situation</th><th>Claude Code</th><th>Codex</th></tr></thead><tbody>
-  <tr><td>Two skills with the same name</td><td>Personal beats project. Plugin skills are namespaced, so they never clash by name.</td><td>Not merged or ranked. Both can show up.</td></tr>
-  <tr><td>Two skills that do similar things</td><td>No tie-break. Claude picks by description and may load both.</td><td>Same: picked by description.</td></tr>
-  <tr><td>Too many skills</td><td>Every name is kept. Past about 1% of the context window, descriptions of the least used skills are dropped.</td><td>Descriptions are limited to about 2% of the context window.</td></tr>
-  <tr><td>Rules that contradict</td><td>All rule files are combined, and Claude "may pick one arbitrarily".</td><td>Files closer to your folder come later and override earlier ones.</td></tr>
-  <tr><td>CLAUDE.md and AGENTS.md in one project</td><td>Reads CLAUDE.md. Reads AGENTS.md only when there is no CLAUDE.md, or when CLAUDE.md imports it with @AGENTS.md.</td><td>Reads AGENTS.md only.</td></tr>
-  <tr><td>A command and a skill with the same name</td><td>The skill wins. A skill also replaces a built-in command with the same name.</td><td>Not applicable.</td></tr>
-  <tr><td>Same MCP server in two places</td><td>Local, then project, then user, then plugin. The winning entry is used whole.</td><td>Not documented.</td></tr>
-  <tr><td>Two hooks on the same event</td><td>Both run. Hooks add up and never replace each other.</td><td>Both run.</td></tr>
-  <tr><td>Subagents with the same name</td><td>Project, then personal, then plugin.</td><td>Not applicable.</td></tr>
+  <h2 class="section">Who wins when things collide</h2><p class="section-sub">From the Claude Code, Codex and Mistral Vibe documentation. Where the docs say nothing, so does this table.</p>
+  <div class="table-wrap"><table class="wins"><thead><tr><th>Situation</th><th>Claude Code</th><th>Codex</th><th>Mistral Vibe</th></tr></thead><tbody>
+  <tr><td>Two skills with the same name</td><td>Personal beats project. Plugin skills are namespaced, so they never clash by name.</td><td>Not merged or ranked. Both can show up.</td><td>Not documented. <code>disabled_skills</code> in config.toml hides one.</td></tr>
+  <tr><td>Two skills that do similar things</td><td>No tie-break. Claude picks by description and may load both.</td><td>Same: picked by description.</td><td>Not documented.</td></tr>
+  <tr><td>Too many skills</td><td>Every name is kept. Past about 1% of the context window, descriptions of the least used skills are dropped.</td><td>Descriptions are limited to about 2% of the context window.</td><td>Not documented.</td></tr>
+  <tr><td>Rules that contradict</td><td>All rule files are combined, and Claude "may pick one arbitrarily".</td><td>Files closer to your folder come later and override earlier ones.</td><td>Closer folders override more distant ones.</td></tr>
+  <tr><td>CLAUDE.md and AGENTS.md in one project</td><td>Reads CLAUDE.md. Reads AGENTS.md only when there is no CLAUDE.md, or when CLAUDE.md imports it with @AGENTS.md.</td><td>Reads AGENTS.md only.</td><td>Reads AGENTS.md only, in folders it trusts.</td></tr>
+  <tr><td>A command and a skill with the same name</td><td>The skill wins. A skill also replaces a built-in command with the same name.</td><td>Not applicable.</td><td>Skills are the custom slash commands.</td></tr>
+  <tr><td>Same MCP server in two places</td><td>Local, then project, then user, then plugin. The winning entry is used whole.</td><td>Not documented.</td><td>Not documented.</td></tr>
+  <tr><td>Two hooks on the same event</td><td>Both run. Hooks add up and never replace each other.</td><td>Both run.</td><td>Both run. Two hooks with the same name: the project one wins.</td></tr>
+  <tr><td>Subagents with the same name</td><td>Project, then personal, then plugin.</td><td>Not applicable.</td><td>Not documented.</td></tr>
   </tbody></table></div>`;
 }
 
@@ -736,8 +736,8 @@ function rulesFilesSection(){
   <div class="table-wrap"><table class="wins"><thead><tr><th></th><th>AGENTS.md</th><th>CLAUDE.md</th><th>SKILL.md</th></tr></thead><tbody>
   <tr><td>What it is</td><td>Project rules for any agent</td><td>Project rules for Claude</td><td>One skill: a how-to for a specific task, in its own folder</td></tr>
   <tr><td>When it loads</td><td>Every session</td><td>Every session</td><td>Only the name and description up front. The rest when a request matches, or when you type /name.</td></tr>
-  <tr><td>Read by</td><td>An open format: Codex, Cursor, GitHub Copilot, Windsurf, Zed and others. Gemini CLI when configured. Claude Code when there is no CLAUDE.md, or when CLAUDE.md imports it.</td><td>Claude Code only</td><td>An open format too, used by Claude, Codex, Cursor and others. Each agent looks in its own folder.</td></tr>
-  <tr><td>Where it lives</td><td>Project root, optionally subfolders. Codex global: <code>~/.codex/AGENTS.md</code></td><td>Project root or <code>.claude/</code>, optionally subfolders. Global: <code>~/.claude/CLAUDE.md</code></td><td><code>.claude/skills/name/</code> for Claude, <code>.agents/skills/name/</code> for Codex and Mistral Vibe (Vibe only in folders it trusts), <code>.vibe/skills/name/</code> for Vibe only, plus plugins</td></tr>
+  <tr><td>Read by</td><td>An open format: Codex, Mistral Vibe (in folders it trusts), Cursor, GitHub Copilot, Windsurf, Zed and others. Gemini CLI when configured. Claude Code when there is no CLAUDE.md, or when CLAUDE.md imports it.</td><td>Claude Code only</td><td>An open format too, used by Claude, Codex, Mistral Vibe, Cursor and others. Each agent looks in its own folder.</td></tr>
+  <tr><td>Where it lives</td><td>Project root, optionally subfolders. Global: <code>~/.codex/AGENTS.md</code> for Codex, <code>~/.vibe/AGENTS.md</code> for Mistral Vibe</td><td>Project root or <code>.claude/</code>, optionally subfolders. Global: <code>~/.claude/CLAUDE.md</code></td><td><code>.claude/skills/name/</code> for Claude, <code>.agents/skills/name/</code> for Codex and Mistral Vibe (Vibe only in folders it trusts), <code>.vibe/skills/name/</code> for Vibe only, plus plugins</td></tr>
   <tr><td>Extras</td><td>A nested file adds rules for its folder. The closest file wins.</td><td><code>@file</code> imports, a private <code>CLAUDE.local.md</code>, <code>.claude/rules/</code> files for matching paths</td><td>Can bring scripts, templates and reference files alongside it</td></tr>
   <tr><td>Best for</td><td>Conventions every agent should follow: stack, commands, style</td><td>Claude-only notes, or a one-line import of AGENTS.md</td><td>Procedures: deploy, release, review, a framework guide</td></tr>
   <tr><td>Keep it</td><td>Short. Every line costs attention on every request.</td><td>Short, for the same reason</td><td>As long as the task needs. Only its description costs anything until it is used.</td></tr>
@@ -747,8 +747,8 @@ function rulesFilesSection(){
   <li><strong>Give Claude a two-line CLAUDE.md</strong> that imports it, and keep only Claude-specific notes under it:<pre>@AGENTS.md
 
 # Claude-only notes (optional)</pre>Leaving CLAUDE.md out also works, since Claude then reads AGENTS.md directly, but the import is explicit and survives someone adding a CLAUDE.md later.</li>
-  <li><strong>Remember global rules do not travel.</strong> Your <code>~/.claude/CLAUDE.md</code> reaches only Claude. Put rules every agent should follow in the project AGENTS.md, or copy them to each tool's global file.</li>
-  <li><strong>Share skills the same way.</strong> SKILL.md is also an open format, but each agent looks in its own folder: Claude in <code>.claude/skills</code>, Codex in <code>.agents/skills</code>. Keep one copy in <code>.agents/skills</code> and link <code>.claude/skills</code> to it, which is what the skills CLI did in newspulse.</li>
+  <li><strong>Remember global rules do not travel.</strong> Each agent has its own global file: <code>~/.claude/CLAUDE.md</code> for Claude, <code>~/.codex/AGENTS.md</code> for Codex, <code>~/.vibe/AGENTS.md</code> for Mistral Vibe. Put rules every agent should follow in the project AGENTS.md, or copy them to each tool's global file.</li>
+  <li><strong>Share skills the same way.</strong> SKILL.md is also an open format, but each agent looks in its own folder: Claude in <code>.claude/skills</code>, Codex and Mistral Vibe in <code>.agents/skills</code>. Keep one copy in <code>.agents/skills</code> and link <code>.claude/skills</code> to it. The skills CLI sets it up this way, and a skill's Share box can add the links.</li>
   </ol></div>
   <div class="reco"><h3>Better than one long file</h3><ol>
   <li><strong>Scoped rules</strong> load only where they apply, which keeps every session lighter: nested AGENTS.md files per folder (all agents), <code>.claude/rules/*.md</code> with a <code>paths:</code> list (Claude), <code>.cursor/rules/*.mdc</code> with globs (Cursor).</li>
@@ -757,8 +757,8 @@ function rulesFilesSection(){
   </ol></div>
   <h3 style="font:600 17px/1.3 var(--serif);margin:26px 0 4px">How your projects are set up</h3><p class="section-sub">Based on the rule files at each project's root. Click a project to see what loads there.</p>
   <div class="setup">
-  <div class="setup-row"><div><b>Global rules</b><div class="muted" style="font-size:13px">Apply in every project</div></div><div>Claude: ${describeGlobal('Claude')}<br>Codex: ${describeGlobal('Codex')}${codexGlobal?.empty?'<div class="muted" style="font-size:13px;margin-top:4px">Codex gets none of your global rules.</div>':''}</div></div>
-  <div class="setup-row"><div><b>Both files, not linked</b><div class="muted" style="font-size:13px">Claude and Codex follow different rules</div></div><div>${chips(drift)}</div></div>
+  <div class="setup-row"><div><b>Global rules</b><div class="muted" style="font-size:13px">Apply in every project</div></div><div>Claude: ${describeGlobal('Claude')}<br>Codex: ${describeGlobal('Codex')}${present.includes('Vibe')?`<br>Mistral Vibe: ${describeGlobal('Vibe')}`:''}${codexGlobal?.empty?'<div class="muted" style="font-size:13px;margin-top:4px">Codex gets none of your global rules.</div>':''}</div></div>
+  <div class="setup-row"><div><b>Both files, not linked</b><div class="muted" style="font-size:13px">Claude follows CLAUDE.md, the other agents follow AGENTS.md</div></div><div>${chips(drift)}</div></div>
   <div class="setup-row"><div><b>Both files, linked</b><div class="muted" style="font-size:13px">CLAUDE.md imports AGENTS.md</div></div><div>${chips(linked)}</div></div>
   <div class="setup-row"><div><b>Only AGENTS.md</b><div class="muted" style="font-size:13px">Every agent reads it, Claude included</div></div><div>${chips(onlyAgents)}</div></div>
   <div class="setup-row"><div><b>Only CLAUDE.md</b><div class="muted" style="font-size:13px">Codex and other agents get no project rules</div></div><div>${chips(onlyClaude)}</div></div>
