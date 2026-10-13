@@ -4,7 +4,7 @@ import { AI_MODEL, askClaude } from './ai.ts';
 import { analyze, short } from './analyze.ts';
 import { nowIso } from './scan.ts';
 import type { Store } from './store.ts';
-import type { Analysis, InstructionStack, Judgements, ProjectRef, RuleStack, SkillContext, Thing } from './types.ts';
+import type { Agent, Analysis, InstructionStack, Judgements, ProjectRef, RuleStack, SkillContext, Thing } from './types.ts';
 
 const PARALLEL_CALLS = 3;
 const DESCRIPTION_CHARS = 400;
@@ -57,14 +57,19 @@ Ignore skills that only share a broad domain but have clearly distinct triggers.
 For each group give: verdict, ids (exactly as listed), title (under 8 words, plain), summary (one sentence on what they have in common), happens (one or two sentences on what ${ctx.agent} will most likely do and why, judged from the descriptions; say plainly that there is no guaranteed tie-break), likelyPick (the id it would most likely load, or empty), advice (one concrete sentence: which to keep, remove, rename or mark manual-only). Return an empty list if nothing qualifies. ${STYLE}`;
 }
 
+/** How each agent combines rule files, per its docs, so the review judges each setup on its own terms. */
+const RULE_ORDER: Partial<Record<Agent, string>> = {
+  Claude: 'Claude Code concatenates these from broadest to most specific. Its docs say that when two instructions contradict, Claude may pick one arbitrarily.',
+  Codex: 'Codex joins these from the global file down to the project. Files closer to the working directory override earlier guidance because they appear later.',
+  Vibe: 'Mistral Vibe loads ~/.vibe/AGENTS.md and the AGENTS.md files from the working directory up to the trust root. Its docs say closer directories override more distant ones.',
+};
+
 function rulePrompt(stack: RuleStack, byId: Map<string, Thing>, projects: Map<string, ProjectRef>): string {
   const parts = stack.rules.map((id, n) => {
     const t = byId.get(id)!;
     return `=== File ${n + 1}: ${short(t.paths[0] ?? '')} (${t.global ? 'global' : 'project'}) ===\n${t.body.slice(0, RULE_FILE_CHARS)}`;
   });
-  const order = stack.agent === 'Claude'
-    ? 'Claude Code concatenates these from broadest to most specific. Its docs say that when two instructions contradict, Claude may pick one arbitrarily.'
-    : 'Codex joins these from the global file down to the project. Files closer to the working directory override earlier guidance because they appear later.';
+  const order = RULE_ORDER[stack.agent] ?? 'Its documentation does not say how these files are combined or which one wins.';
   return `These instruction files all load into the same ${stack.agent} session ${where(stack.project, projects)}, in this order. ${order}
 
 ${parts.join('\n\n')}
