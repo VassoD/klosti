@@ -120,7 +120,7 @@ export function record(path: string, kind?: RuleFamily): FileRecord {
 
 const isRule = (path: string): boolean => RULE_NAMES.has(basename(path)) || basename(path).endsWith('.instructions.md') || RULE_DIRS.some(d => posix(path).includes(d));
 
-type ConfigKind = 'skills-lock' | 'mcp-json' | 'claude-settings' | 'cursor-mcp' | 'codex-config' | 'command' | 'subagent' | 'output-style';
+type ConfigKind = 'skills-lock' | 'mcp-json' | 'claude-settings' | 'cursor-mcp' | 'codex-config' | 'vibe-config' | 'vibe-hooks' | 'command' | 'subagent' | 'output-style';
 
 function configKind(path: string): ConfigKind | null {
   const name = basename(path), parent = basename(dirname(path)), grand = basename(dirname(dirname(path)));
@@ -129,6 +129,8 @@ function configKind(path: string): ConfigKind | null {
   if (parent === '.claude' && (name === 'settings.json' || name === 'settings.local.json')) return 'claude-settings';
   if (parent === '.cursor' && name === 'mcp.json') return 'cursor-mcp';
   if (parent === '.codex' && (name === 'config.toml' || name === 'hooks.json')) return 'codex-config';
+  if (parent === '.vibe' && name === 'config.toml') return 'vibe-config';
+  if (parent === '.vibe' && name === 'hooks.toml') return 'vibe-hooks';
   if (name.endsWith('.md') && posix(path).includes('/.claude/commands/')) return 'command';
   if (name.endsWith('.md') && parent === 'agents' && grand === '.claude') return 'subagent';
   if (name.endsWith('.md') && parent === 'output-styles' && grand === '.claude') return 'output-style';
@@ -399,6 +401,19 @@ function mcpItems(servers: unknown, agent: Agent, source: string, mcpScope: McpS
   });
 }
 
+/** Vibe lists hooks as [[hooks]] tables in hooks.toml, each with a type (pre_tool, post_tool, post_agent). */
+function vibeHookItems(hooks: unknown, source: string): HookExtra[] {
+  if (!Array.isArray(hooks)) return [];
+  return hooks.map(asRecord).filter(h => asString(h.type) && asString(h.command)).map(h => {
+    const event = asString(h.type) ?? '', matcher = asString(h.match) ?? '', command = asString(h.command) ?? '';
+    const key = `hook:${source}:${event}:${matcher}:${sha256(command).slice(0, 10)}`;
+    return { kind: 'hook', name: event, agent: 'Vibe', path: source, ...base(source, {}), key, sha256: key, event, matcher, handlerType: 'command', command: redact(command), timeout: typeof h.timeout === 'number' ? h.timeout : null, status: asString(h.description) ?? asString(h.name) };
+  });
+}
+
+/** Vibe lists MCP servers as [[mcp_servers]] tables with a name, where Claude and Codex key them by name. */
+const byName = (servers: unknown): Record<string, unknown> => (Array.isArray(servers) ? Object.fromEntries(servers.map(asRecord).filter(s => asString(s.name)).map(s => [asString(s.name), s])) : {});
+
 function markdownItem(kind: MarkdownExtra['kind'], path: string, agent: Agent, plugin: PluginRoot | null = null, prefix = ''): MarkdownExtra {
   const text = readFileSync(path, 'utf8');
   const meta = frontmatter(text);
@@ -417,7 +432,7 @@ function pluginMarkdown(plugin: PluginRoot, folder: string, kind: MarkdownExtra[
   return readdirSync(dir).filter(n => n.endsWith('.md') && !n.startsWith('_')).sort().map(n => markdownItem(kind, join(dir, n), plugin.agent, plugin, `${plugin.id.split('@')[0]}:`));
 }
 
-function collectExtras(config: Map<ConfigKind, Set<string>>, plugins: PluginRoot[], errors: string[]): Extras {
+function collectExtras(config: Map<ConfigKind, Set<string>>, plugins: PluginRoot[], vibe: VibeSetup, errors: string[]): Extras {
   const extras: Extras = { commands: [], subagents: [], hooks: [], mcp: [], outputStyles: [] };
   const files = (kind: ConfigKind): string[] => [...(config.get(kind) ?? [])].sort();
   const safely = (fn: () => void): void => { try { fn(); } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); } };
@@ -432,6 +447,10 @@ function collectExtras(config: Map<ConfigKind, Set<string>>, plugins: PluginRoot
     extras.hooks.push(...hookItems(data.hooks, 'Codex', p));
     if (p.endsWith('.toml')) extras.mcp.push(...mcpItems(data.mcp_servers, 'Codex', p, scopeOf(p) === 'User-wide' ? 'user' : 'project'));
   }
+  // Vibe loads a project's .vibe folder only when the project is trusted.
+  const vibeReads = (p: string): boolean => vibe.installed && (scopeOf(p) === 'User-wide' || !vibe.untrusted.some(u => isInside(p, u)));
+  for (const p of files('vibe-config').filter(vibeReads)) extras.mcp.push(...mcpItems(byName(readToml(p, errors).mcp_servers), 'Vibe', p, scopeOf(p) === 'User-wide' ? 'user' : 'project'));
+  for (const p of files('vibe-hooks').filter(vibeReads)) extras.hooks.push(...vibeHookItems(readToml(p, errors).hooks, p));
   if (existsSync(CLAUDE_JSON)) {
     const claudeJson = readJson(CLAUDE_JSON, errors);
     extras.mcp.push(...mcpItems(claudeJson.mcpServers, 'Claude', CLAUDE_JSON, 'user', { userWide: true }));
@@ -536,6 +555,10 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   if (MANAGED_CLAUDE_MD && existsSync(MANAGED_CLAUDE_MD)) found.rules.add(MANAGED_CLAUDE_MD);
   const files: FileRecord[] = [];
   for (const p of [...found.rules].sort()) { try { files.push(record(p)); } catch (error) { errors.push(String(error)); } }
+  for (const f of files) {
+    // Vibe reads AGENTS.md from the working folder up to the trust root, only in trusted folders.
+    if (basename(f.path) === 'AGENTS.md' && f.scope === 'Folder' && vibe.installed && !vibe.untrusted.some(u => isInside(f.path, u))) f.readers = ['Vibe'];
+  }
   const byPath = resolveImports(files, errors);
   const origins = skillOrigins(found.config.get('skills-lock') ?? [], errors);
   const skills: FileRecord[] = [];
@@ -550,7 +573,7 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
     }
   }
   const items: FileRecord[] = [...byPath.values(), ...skills];
-  const extras = collectExtras(found.config, plugins, errors);
+  const extras = collectExtras(found.config, plugins, vibe, errors);
   // Keep the last known entries for unreadable roots so a blocked scan does not look like deletions.
   const known = new Set([...items, ...allExtras(extras)].map(x => x.key));
   for (const root of found.unreadable) {

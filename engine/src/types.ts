@@ -46,6 +46,8 @@ export interface FileRecord {
   linkTarget?: string;
   /** Where the path ends up after every link, when that differs from path. */
   realPath?: string;
+  /** Agents that read this rule file besides the ones its name implies, such as Vibe for a project AGENTS.md. */
+  readers?: Agent[];
   skill?: SkillMeta;
   firstSeen?: string;
   changedAt?: string | null;
