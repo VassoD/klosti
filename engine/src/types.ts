@@ -1,4 +1,4 @@
-export type Agent = 'Claude' | 'Codex' | 'Cursor' | 'Gemini' | 'Other';
+export type Agent = 'Claude' | 'Codex' | 'Cursor' | 'Gemini' | 'Vibe' | 'Other';
 export type Scope = 'User-wide' | 'Folder';
 export type RuleFamily = 'Claude' | 'Codex / shared' | 'Cursor' | 'Gemini' | 'Windsurf' | 'Copilot' | 'Referenced document' | 'Skill';
 export type SkillSource = 'plugin' | 'synced' | 'system' | 'user' | 'project';
@@ -20,6 +20,8 @@ export interface SkillMeta {
   name: string;
   description: string;
   agent: Agent;
+  /** Every agent that loads the skill from this path. Inventories from before this field only have agent. */
+  agents?: Agent[];
   source: SkillSource;
   origin: string | null;
   plugin: PluginRef | null;
@@ -42,6 +44,8 @@ export interface FileRecord {
   text: string;
   imports: ImportRef[];
   linkTarget?: string;
+  /** Where the path ends up after every link, when that differs from path. */
+  realPath?: string;
   skill?: SkillMeta;
   firstSeen?: string;
   changedAt?: string | null;
@@ -106,6 +110,9 @@ export interface ChangeSummary {
   name: string;
   agent: string;
   path: string;
+  /** One skill reached through links is one change: every agent and path it covers. Older entries lack these. */
+  agents?: string[];
+  paths?: string[];
 }
 
 export interface HistoryEntry {
@@ -161,6 +168,14 @@ export interface Location {
   project: ProjectRef | null;
   source: SkillSource | null;
   linkTarget: string | null;
+  realPath: string | null;
+}
+
+/** A link that would let one more agent load a skill kept in ~/.agents/skills. */
+export interface ShareTarget {
+  agent: Agent;
+  link: string;
+  source: string;
 }
 
 /** Anything an agent can use: a rule, skill, command, subagent, hook or MCP server. */
@@ -195,6 +210,8 @@ export interface Thing {
   manualOnly?: boolean;
   hiddenFromMenu?: boolean;
   linkTarget?: string | null;
+  realPath?: string | null;
+  share?: ShareTarget[];
   model?: string | null;
   tools?: string | null;
   event?: string;
@@ -216,7 +233,7 @@ export interface Quote {
 
 export interface Finding {
   id: string;
-  kind: 'same-name' | 'shadows-builtin' | 'overlap' | 'contradiction' | 'drift' | 'budget' | 'hidden';
+  kind: 'same-name' | 'shadows-builtin' | 'overlap' | 'contradiction' | 'drift' | 'budget' | 'hidden' | 'listed-twice';
   severity: Severity;
   title: string;
   summary: string;
@@ -234,6 +251,8 @@ export interface Finding {
   quotes?: Quote[];
   partlyFixed?: boolean;
   estimate?: boolean;
+  /** Skill folder links that can go because every agent they serve still reaches the skill another way. */
+  extraLinks?: string[];
 }
 
 export interface SkillGroup {

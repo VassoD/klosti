@@ -14,7 +14,7 @@ const MAX_BODY_BYTES = 10_000;
 const WATCH_DEBOUNCE_MS = 4000;
 const PERIODIC_RESCAN_MS = 3 * 60 * 60 * 1000;
 /** Folders where installs land. Project skills are caught by the periodic rescan. */
-const WATCHED = ['.claude/skills', '.claude/plugins', '.codex/skills', '.codex/config.toml', '.agents/skills'];
+const WATCHED = ['.claude/skills', '.claude/plugins', '.codex/skills', '.codex/config.toml', '.agents/skills', '.gemini/skills', '.vibe/skills', '.vibe/config.toml'];
 
 const Body = z.object({
   finding: z.string().optional(), quote: z.number().optional(), dryRun: z.boolean().optional(), expect: z.string().optional(),
@@ -152,6 +152,8 @@ export class KlostiServer {
       case '/api/onboard': return this.serialize(() => changed({ ...a.onboard(body.roots ?? [], body.agents ?? [], body.ignored ?? []) }));
       case '/api/settings': return this.serialize(() => changed({ ...a.saveSettings(body.roots ?? [], body.agents ?? [], body.ignored) }));
       case '/api/ignore-folder': return this.serialize(() => changed({ ...a.ignoreFolder(body.path ?? '', body.ignore ?? true) }));
+      case '/api/remove-link': return this.serialize(() => changed({ ...a.removeLink(body.finding ?? '', body.path ?? '') }));
+      case '/api/share-skill': return this.serialize(() => changed({ ...a.shareSkill(body.id ?? '', body.agents ?? []) }));
       case '/api/disable-plugin': return this.serialize(() => changed({ ...a.disablePlugin(body.id ?? '') }));
       case '/api/rescan': return this.serialize(() => { rescan(this.store, this.config); return changed({ message: 'Scanned again.' }); });
       case '/api/review': {

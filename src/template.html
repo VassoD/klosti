@@ -8,16 +8,16 @@
 /* brand-tokens:start */
 /* klosti brand tokens. The single source for the app (src/template.html) and the site (site/).
    Edit here, then run `node brand/sync.mjs`. Agent colors are validated with the dataviz
-   palette checker in this order (Claude, Codex, Cursor, Gemini) and always sit next to a name. */
+   palette checker in this order (Claude, Codex, Cursor, Gemini, Vibe) and always sit next to a name. */
 :root{color-scheme:light;
 --paper:#f6f4ef;--paper-2:#efece5;--card:#fffefb;--ink:#22201c;--ink-2:#4a463f;--muted:#7a756b;--line:#e3dfd5;--line-2:#d6d1c5;
 --clay:#bd5b3b;--clay-soft:#f6e6dd;--clay-ink:#9a4426;
 --high:#b2402c;--high-soft:#f7e4df;--medium:#a86a12;--medium-soft:#f6ecd9;--low:#5f6f82;--low-soft:#e8ecf1;--ok:#3f7d5c;--ok-soft:#e3f0e8;
---claude:#eb6834;--codex:#1baf7a;--cursor:#eda100;--gemini:#2a78d6;--other:#7a756b;
+--claude:#eb6834;--codex:#1baf7a;--cursor:#eda100;--gemini:#2a78d6;--vibe:#8a5bd4;--other:#7a756b;
 --serif:"Iowan Old Style",var(--font-serif-web,Charter),Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono",var(--font-mono-web,Menlo),monospace;
 --radius-lg:14px;--radius:9px;--radius-sm:6px}
-:root[data-theme=dark]{color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5}}
+:root[data-theme=dark]{color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5;--vibe:#a585e6}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5;--vibe:#a585e6}}
 /* brand-tokens:end */
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -393,7 +393,7 @@ const $=id=>document.getElementById(id);
 const projectChoices=new Map();
 if(D.onboarding){welcome(D.onboarding);return;}
 /** Counts before the agent filter, so Settings can show what each agent has on this Mac. */
-const FOUND=Object.fromEntries(['Claude','Codex','Cursor','Gemini'].map(a=>[a,D.things.filter(t=>t.agents.includes(a)).length]));
+const FOUND=Object.fromEntries(['Claude','Codex','Cursor','Gemini','Vibe'].map(a=>[a,D.things.filter(t=>t.agents.includes(a)).length]));
 const CHOSEN=D.settings?.agents?.length?new Set(D.settings.agents):null;
 if(CHOSEN){
   const keep=as=>!as.length||as.some(a=>CHOSEN.has(a));
@@ -404,7 +404,7 @@ if(CHOSEN){
 }
 const byId=new Map(D.things.map(t=>[t.id,t]));
 const projectsById=new Map(D.projects.map(p=>[p.id,p]));
-const AGENTS=['Claude','Codex','Cursor','Gemini'];
+const AGENTS=['Claude','Codex','Cursor','Gemini','Vibe'];
 const NEW_WINDOW_DAYS=14,DAY_MS=864e5,ROW_LIMIT=40;
 const KIND={rule:{one:'rule file',many:'rule files',title:'Rules'},skill:{one:'skill',many:'skills',title:'Skills'},command:{one:'command',many:'commands',title:'Commands'},subagent:{one:'subagent',many:'subagents',title:'Subagents'},hook:{one:'hook',many:'hooks',title:'Hooks'},mcp:{one:'MCP server',many:'MCP servers',title:'MCP servers'},'output-style':{one:'output style',many:'output styles',title:'Output styles'}};
 const KIND_ORDER=['skill','rule','command','subagent','hook','mcp'];
@@ -456,7 +456,9 @@ const dateLabel=iso=>new Date(iso).toLocaleDateString('en-GB',{day:'numeric',mon
 const inline=s=>esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
 function md(text){let html='',list=false,code=false,buf=[];const close=()=>{if(list){html+='</ul>';list=false;}};for(const line of String(text).split('\n')){if(line.trim().startsWith('```')){close();if(code){html+='<pre><code>'+esc(buf.join('\n'))+'</code></pre>';buf=[];}code=!code;continue;}if(code){buf.push(line);continue;}if(/^\s*[-*]\s+/.test(line)||/^\s*\d+[.)]\s+/.test(line)){if(!list){html+='<ul>';list=true;}html+='<li>'+inline(line.replace(/^\s*(?:[-*]|\d+[.)])\s+/,''))+'</li>';}else{close();if(!line.trim()||/^\s*---+\s*$/.test(line))continue;const h=line.match(/^(#{1,4})\s+(.+)/);if(h){const l=Math.min(5,h[1].length+2);html+=`<h${l}>${inline(h[2])}</h${l}>`;}else if(line.startsWith('>'))html+='<blockquote>'+inline(line.replace(/^>\s?/,''))+'</blockquote>';else html+='<p>'+inline(line)+'</p>';}}close();if(buf.length)html+='<pre>'+esc(buf.join('\n'))+'</pre>';return html;}
 
-const agentDot=a=>`<span class="agent" style="--c:var(--${a.toLowerCase()},var(--other))"><i></i>${esc(a)}</span>`;
+const AGENT_NAME={Vibe:'Mistral Vibe'};
+const agentName=a=>AGENT_NAME[a]||a;
+const agentDot=a=>`<span class="agent" style="--c:var(--${a.toLowerCase()},var(--other))"><i></i>${esc(agentName(a))}</span>`;
 const agentList=as=>`<span class="agents">${as.map(agentDot).join('')}</span>`;
 const pluginName=id=>cap(String(id||'').split('@')[0].replace(/[-_]/g,' '));
 const repoName=r=>cap(String(r).split('/').pop().replace(/[-_]/g,' '));
@@ -497,7 +499,7 @@ function render(){
 }
 
 const SEV_LABEL={high:'Act on this',medium:'Worth checking',low:'For your information'};
-const KIND_LABEL={'same-name':'Same name',overlap:'Overlap',contradiction:'Contradiction',drift:'Different instructions',budget:'Skill list size','shadows-builtin':'Replaces a built-in',hidden:'Hidden instructions'};
+const KIND_LABEL={'same-name':'Same name',overlap:'Overlap',contradiction:'Contradiction',drift:'Different instructions',budget:'Skill list size','shadows-builtin':'Replaces a built-in',hidden:'Hidden instructions','listed-twice':'Listed twice'};
 function overview(){
   const count=k=>D.things.filter(t=>t.kind===k).length;
   const high=live().filter(f=>f.severity==='high').length,medium=live().filter(f=>f.severity==='medium').length;
@@ -538,7 +540,7 @@ function findingCard(f,forceOpen){
   const source=f.reviewed?'Reviewed by Claude':f.verdict==='candidate'?'Word match, not reviewed':f.estimate?'Estimate':'';
   const gone=dismissed.has(f.id);
   return`<article class="finding${open?' is-open':''}${gone?' is-dismissed':''}" data-card="${f.id}"><button data-finding="${f.id}" aria-expanded="${open}"><div><div class="meta"><span class="sev ${f.severity}">${SEV_LABEL[f.severity]}</span><span>${esc(KIND_LABEL[f.kind]||f.kind)}${f.partlyFixed?', partly fixed':''}</span><span>${esc(f.where)}</span>${agentList(f.agents)}${source?`<span>${source}</span>`:''}</div><h3>${esc(f.title)}</h3><p class="sum">${esc(f.summary)}</p></div><span class="caret" aria-hidden="true">›</span></button>
-  ${open?`<div class="finding-body"><div class="explain"><div><b>What happens</b>${esc(f.happens)}</div><div><b>What you can do</b>${esc(f.todo)}</div></div>${quotes?`<div class="quotes">${quotes}</div>${editHint}`:''}${f.items.length?`<div class="items-row">${f.items.map(thingChip).join('')}</div>`:''}<div class="fix-slot" id="fix-${f.id}"></div><div class="finding-actions">${editable&&!gone&&(!D.ai||D.ai.via)?`<button class="btn-ai" data-fix="${f.id}" title="Claude proposes an edit. You review it before anything changes.">Fix with AI</button>`:''}${editable&&!gone?`<button class="btn-primary" data-resolve="${f.id}">Mark as resolved</button>`:''}${gone?`<button class="btn-quiet" data-restore="${f.id}">Bring back</button>`:`<button class="btn-quiet" data-dismiss="${f.id}" title="Hide it without changing any file">Ignore this</button>`}</div></div>`:''}</article>`;
+  ${open?`<div class="finding-body"><div class="explain"><div><b>What happens</b>${esc(f.happens)}</div><div><b>What you can do</b>${esc(f.todo)}</div></div>${quotes?`<div class="quotes">${quotes}</div>${editHint}`:''}${f.items.length?`<div class="items-row">${f.items.map(thingChip).join('')}</div>`:''}<div class="fix-slot" id="fix-${f.id}"></div><div class="finding-actions">${API&&!gone&&(f.extraLinks||[]).length?f.extraLinks.map(p=>`<button class="btn-primary" data-remove-link="${f.id}" data-path="${esc(p)}" title="Deletes only the link. The skill folder stays.">${f.extraLinks.length>1?`Remove ${esc(short(p))}`:'Remove the extra link'}</button>`).join(''):''}${editable&&!gone&&(!D.ai||D.ai.via)?`<button class="btn-ai" data-fix="${f.id}" title="Claude proposes an edit. You review it before anything changes.">Fix with AI</button>`:''}${editable&&!gone?`<button class="btn-primary" data-resolve="${f.id}">Mark as resolved</button>`:''}${gone?`<button class="btn-quiet" data-restore="${f.id}">Bring back</button>`:`<button class="btn-quiet" data-dismiss="${f.id}" title="Hide it without changing any file">Ignore this</button>`}</div></div>`:''}</article>`;
 }
 
 function visible(t,agent,pid){return t.agents.includes(agent)&&(t.global||(!!pid&&t.projects.some(p=>p.id===pid)));}
@@ -562,9 +564,9 @@ function lens(){
   const issues=live().filter(f=>f.agents.includes(agent)&&(f.where==='Everywhere'||(pid&&f.projectIds.includes(pid))));
   const budget=D.budgets.find(b=>b.agent===agent&&b.project===(pid||null));
   const thread=threadView(here,rules,issues,pid,pname);
-  return`<h1 class="lede">What ${esc(agent)} sees ${pid?'in '+esc(pname):'outside any project'}</h1>
+  return`<h1 class="lede">What ${esc(agentName(agent))} sees ${pid?'in '+esc(pname):'outside any project'}</h1>
   <p class="lede-sub">Follow the thread from the top: global first, then plugins, then the project. Numbered beads are rule files, loaded into every session in that order. Knots tie together files that clash.</p>
-  <div class="lens-controls"><div class="seg" role="group" aria-label="Agent">${present.map(a=>`<button data-lens-agent="${a}" aria-pressed="${a===agent}">${a}</button>`).join('')}</div>
+  <div class="lens-controls"><div class="seg" role="group" aria-label="Agent">${present.map(a=>`<button data-lens-agent="${a}" aria-pressed="${a===agent}">${esc(agentName(a))}</button>`).join('')}</div>
   <label><span class="sr-only">Project</span><select class="pick" id="lens-project"><option value="">No project (global only)</option>${projectOpts.map(p=>`<option value="${esc(p.id)}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>${pid&&API?`<button class="btn-quiet" data-ignore-folder="${esc(pid)}" title="Klosti will skip this folder. Bring it back under Changes.">Stop scanning this project</button>`:''}</div>
   ${thread}${emptyNote}${pickHint}
   ${band(`Available on demand <span class="count-inline">${skills.length}</span>`,`${esc(agent)} sees each name and description, and reads the full skill only when your request matches or you call it by name.`,(budget?skillMeter(budget,agent):'')+(skills.length?grouped(skills):'<p class="muted">No skills here.</p>'))}
@@ -679,7 +681,7 @@ function inventory(){
   <p class="lede-sub">Grouped by where it came from, so a plugin or a skill pack stays together. Global means every project. A project name means only there.</p>
   <div class="seg kind-tabs" role="group" aria-label="Type">${kinds.map(k=>`<button data-kind="${k}" aria-pressed="${state.kind===k}">${KIND[k].title} <span class="muted">${D.things.filter(t=>t.kind===k).length}</span></button>`).join('')}</div>
   <div class="toolbar"><label class="search"><span class="sr-only">Search</span><input id="q" type="search" placeholder="Search names, descriptions, paths" value="${esc(state.query)}"></label>
-  <div class="seg" role="group" aria-label="Agent"><button data-inv-agent="all" aria-pressed="${state.invAgent==='all'}">All agents</button>${AGENTS.filter(a=>ofKind.some(t=>t.agents.includes(a))).map(a=>`<button data-inv-agent="${a}" aria-pressed="${state.invAgent===a}">${a}</button>`).join('')}</div>
+  <div class="seg" role="group" aria-label="Agent"><button data-inv-agent="all" aria-pressed="${state.invAgent==='all'}">All agents</button>${AGENTS.filter(a=>ofKind.some(t=>t.agents.includes(a))).map(a=>`<button data-inv-agent="${a}" aria-pressed="${state.invAgent===a}">${esc(agentName(a))}</button>`).join('')}</div>
   <div class="seg" role="group" aria-label="Scope">${[['all','Anywhere'],['global','Global'],['project','Project']].map(([v,l])=>`<button data-inv-scope="${v}" aria-pressed="${state.invScope===v}">${l}</button>`).join('')}</div></div>
   <p class="muted" style="font-size:13px;margin:0 0 20px">Showing ${pool.length} of ${ofKind.length} ${KIND[state.kind].many}</p>
   ${packs||'<div class="empty-state">No matches. Clear the search or pick another filter.</div>'}`;
@@ -735,7 +737,7 @@ function rulesFilesSection(){
   <tr><td>What it is</td><td>Project rules for any agent</td><td>Project rules for Claude</td><td>One skill: a how-to for a specific task, in its own folder</td></tr>
   <tr><td>When it loads</td><td>Every session</td><td>Every session</td><td>Only the name and description up front. The rest when a request matches, or when you type /name.</td></tr>
   <tr><td>Read by</td><td>An open format: Codex, Cursor, GitHub Copilot, Windsurf, Zed and others. Gemini CLI when configured. Claude Code when there is no CLAUDE.md, or when CLAUDE.md imports it.</td><td>Claude Code only</td><td>An open format too, used by Claude, Codex, Cursor and others. Each agent looks in its own folder.</td></tr>
-  <tr><td>Where it lives</td><td>Project root, optionally subfolders. Codex global: <code>~/.codex/AGENTS.md</code></td><td>Project root or <code>.claude/</code>, optionally subfolders. Global: <code>~/.claude/CLAUDE.md</code></td><td><code>.claude/skills/name/</code> for Claude, <code>.agents/skills/name/</code> for Codex, plus plugins</td></tr>
+  <tr><td>Where it lives</td><td>Project root, optionally subfolders. Codex global: <code>~/.codex/AGENTS.md</code></td><td>Project root or <code>.claude/</code>, optionally subfolders. Global: <code>~/.claude/CLAUDE.md</code></td><td><code>.claude/skills/name/</code> for Claude, <code>.agents/skills/name/</code> for Codex and Mistral Vibe (Vibe only in folders it trusts), <code>.vibe/skills/name/</code> for Vibe only, plus plugins</td></tr>
   <tr><td>Extras</td><td>A nested file adds rules for its folder. The closest file wins.</td><td><code>@file</code> imports, a private <code>CLAUDE.local.md</code>, <code>.claude/rules/</code> files for matching paths</td><td>Can bring scripts, templates and reference files alongside it</td></tr>
   <tr><td>Best for</td><td>Conventions every agent should follow: stack, commands, style</td><td>Claude-only notes, or a one-line import of AGENTS.md</td><td>Procedures: deploy, release, review, a framework guide</td></tr>
   <tr><td>Keep it</td><td>Short. Every line costs attention on every request.</td><td>Short, for the same reason</td><td>As long as the task needs. Only its description costs anything until it is used.</td></tr>
@@ -762,20 +764,21 @@ function rulesFilesSection(){
   <div class="setup-row"><div><b>Only CLAUDE.md</b><div class="muted" style="font-size:13px">Codex and other agents get no project rules</div></div><div>${chips(onlyClaude)}</div></div>
   </div>`;
 }
-const ACTION_TEXT={'ai-fix':'Fixed with AI','delete-line':'Deleted a line',restore:'Restored from backup',trash:'Moved to the Trash','disable-plugin':'Disabled a plugin',resolve:'Marked as resolved',unresolve:'Put back on the list','ignore-folder':'Stopped scanning a folder','unignore-folder':'Scanning a folder again',settings:'Changed settings'};
+const ACTION_TEXT={'ai-fix':'Fixed with AI','delete-line':'Deleted a line',restore:'Restored from backup',trash:'Moved to the Trash','disable-plugin':'Disabled a plugin',resolve:'Marked as resolved',unresolve:'Put back on the list','ignore-folder':'Stopped scanning a folder','unignore-folder':'Scanning a folder again',settings:'Changed settings','share-skill':'Shared a skill with more agents','remove-link':'Removed an extra link'};
 const FIX_WINDOW_MS=3*60*1000;
 const SIGN={added:'+',changed:'~',removed:'−'},VERB={added:'Added',changed:'Changed',removed:'Removed'};
 const whenLabel=iso=>new Date(iso).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 function actionEntry(a,first,restoredBackups){
   const what=a.title||a.name||(a.files||[]).join(', ');
   const diffs=(a.edits||[]).map(e=>`<div class="edit"><span class="path">${esc(e.file)}</span><div class="diff"><pre class="old">${esc(e.before)}</pre><pre class="new${e.after.trim()?'':' empty'}">${e.after.trim()?esc(e.after):'(deleted)'}</pre></div></div>`).join('');
-  const canRestore=API&&(a.kind==='ai-fix'||a.kind==='delete-line')&&a.backups?.length&&!a.backups.every(b=>restoredBackups.has(b));
-  const restore=canRestore?`<button class="btn-quiet" data-restore-backups="${esc(JSON.stringify(a.backups))}">Restore</button>`:'';
+  const canRestore=API&&['ai-fix','delete-line','share-skill','remove-link'].includes(a.kind)&&a.backups?.length&&!a.backups.every(b=>restoredBackups.has(b));
+  const restore=canRestore?`<button class="btn-quiet" data-restore-backups="${esc(JSON.stringify(a.backups))}">${a.kind==='share-skill'?'Undo':'Restore'}</button>`:'';
   const hint=a.kind==='trash'?' <span class="muted">Use Put Back in Finder to restore it.</span>':'';
   return`<li><div class="fix-head"><div><span class="muted">${esc(ACTION_TEXT[a.kind]||a.kind)}, ${whenLabel(a.at)}</span><br><b>${esc(what)}</b>${hint}</div>${restore}</div>${a.summary?`<p>${esc(a.summary)}</p>`:''}${diffs?`<details ${first?'open':''}><summary>See the change</summary>${diffs}</details>`:''}</li>`;
 }
 function scanEntry(e,changes){
-  const item=c=>{const t=c.cls==='removed'?null:D.things.find(x=>x.paths.includes(c.path));const folder=short(c.path).split('/').slice(0,-1).join('/').replace(/\/(?:\.claude|\.agents)\/skills\/[^/]+$/,'')||'~';return`<span class="change ${c.cls}" title="${VERB[c.cls]}"><span aria-hidden="true">${SIGN[c.cls]}</span><span class="sr-only">${VERB[c.cls]}</span> ${t?`<button class="chip" data-thing="${t.id}">${esc(c.name)}</button>`:esc(c.name)} <span class="k">${esc(c.kind)}, ${esc(c.agent)}, in ${esc(folder)}</span></span>`;};
+  const folderOf=p=>short(p).split('/').slice(0,-1).join('/').replace(/\/\.(?:claude|agents|codex|gemini|vibe|cursor)\/skills\/[^/]+$/,'')||'~';
+  const item=c=>{const t=c.cls==='removed'?null:D.things.find(x=>x.paths.includes(c.path));const agents=(c.agents||[c.agent]).map(agentName).join(', ');const folders=[...new Set((c.paths||[c.path]).map(folderOf))].join(', ');const via=(c.paths||[]).length>1?` <span class="k">(${c.paths.length} paths: ${esc(c.paths.map(short).join(', '))})</span>`:'';return`<span class="change ${c.cls}" title="${VERB[c.cls]}"><span aria-hidden="true">${SIGN[c.cls]}</span><span class="sr-only">${VERB[c.cls]}</span> ${t?`<button class="chip" data-thing="${t.id}">${esc(c.name)}</button>`:esc(c.name)} <span class="k">${esc(c.kind)}, ${esc(agents)}, in ${esc(folders)}</span>${via}</span>`;};
   return`<li><div class="fix-head"><div><span class="muted">Noticed by a scan, ${whenLabel(e.at)}</span></div></div><p>${changes.map(item).join('')}</p></li>`;
 }
 function historyList(){
@@ -882,7 +885,7 @@ function welcome(ob){
     const keep=new Map([...document.querySelectorAll('#page input[type=checkbox]')].map(i=>[`${i.name}|${i.value}`,i.checked]));
     const checked=(key,fallback)=>keep.has(key)?keep.get(key):fallback;
     const anyFound=ob.agents.some(a=>a.found);
-    const agents=ob.agents.map(a=>`<label class="agent-card${a.found?'':' is-missing'}" style="--c:var(--${a.name.toLowerCase()},var(--other))"><input type="checkbox" name="agent" value="${a.name}"${checked(`agent|${a.name}`,a.found||!anyFound)?' checked':''}><span class="agent-orb"><i></i></span><span class="agent-meta"><b>${a.name}</b><span class="muted">${a.found?'Found on this Mac':'Not found'}</span></span><span class="agent-tick" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5" pathLength="1"/></svg></span></label>`).join('');
+    const agents=ob.agents.map(a=>`<label class="agent-card${a.found?'':' is-missing'}" style="--c:var(--${a.name.toLowerCase()},var(--other))"><input type="checkbox" name="agent" value="${a.name}"${checked(`agent|${a.name}`,a.found||!anyFound)?' checked':''}><span class="agent-orb"><i></i></span><span class="agent-meta"><b>${a.name==='Vibe'?'Mistral Vibe':a.name}</b><span class="muted">${a.found?'Found on this Mac':'Not found'}</span></span><span class="agent-tick" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.5l4.5-5" pathLength="1"/></svg></span></label>`).join('');
     const folders=[...ob.folders,...added.map(path=>({path,projects:[]}))].map(f=>{
       const open=opened.has(f.path);
       const rows=f.projects.map((p,i)=>`<label class="setting-row sub" style="--i:${i}"><input type="checkbox" name="project" value="${escape(p)}"${(projectChoices.has(p)?projectChoices.get(p):true)?' checked':''}><span><b>${escape(p.slice(f.path.length+1))}</b></span><span></span></label>`).join('');
@@ -1011,6 +1014,15 @@ function sourceUrl(t){
   if(t.source==='synced')return'https://claude.ai/settings/capabilities';
   return'';
 }
+/** A skill in ~/.agents/skills that some agents found on this computer do not load yet. */
+function shareNote(t){
+  const targets=(t.share||[]).filter(s=>!CHOSEN||CHOSEN.has(s.agent));
+  if(!targets.length)return'';
+  const names=targets.map(s=>agentName(s.agent)).join(' and ');
+  const why=`Kept in <code>~/.agents/skills</code>, which ${esc(names)} ${targets.length>1?'do':'does'} not read. A link adds it there without copying, so every agent uses the same file.`;
+  if(!API)return`<div class="remove-box"><span>${why} Run ${targets.map(s=>`<code>ln -s ${esc(short(s.source))} ${esc(short(s.link))}</code>`).join(' and ')}, or open it in the app with <code>npx klosti</code>.</span></div>`;
+  return`<div class="remove-box"><span>${why} You can undo it.</span><button class="btn-primary" data-share-skill="${t.id}" data-agents="${esc(JSON.stringify(targets.map(s=>s.agent)))}">Link for ${esc(names)}</button></div>`;
+}
 function showThing(id){
   const t=byId.get(id);if(!t)return;
   const fs=findingsFor(id);
@@ -1023,9 +1035,10 @@ function showThing(id){
     return`<div class="loc"><div><span class="path">${esc(short(l.path))}</span>${who}${hint}</div>${canTrash(t,l.path)?`<button class="btn-danger" data-trash="${t.id}" data-path="${esc(l.path)}">${removeLabel}</button>`:''}</div>`;
   }).join('');
   const issues=fs.length?`<h4>Issues</h4><div class="findings">${fs.map(f=>findingCard(f,true)).join('')}</div>`:'';
+  const share=shareNote(t);
   const body=t.kind==='hook'?`<h4>Command</h4><code class="cmd">${esc(t.command)}</code>`:t.body?`<h4>${t.kind==='rule'?'Full text':'Instructions'}</h4><div class="markdown">${md(t.body)}</div>`:'';
   $('drawer-kind').textContent=cap(KIND[t.kind].one);
-  $('drawer-body').innerHTML=`<div class="agents">${isNew(t)?'<span class="badge-new">New</span>':''}${scopeChip(t)}</div><h2 id="drawer-title">${esc(t.kind==='rule'?t.title:t.name)}</h2><p class="what">${esc(t.description&&t.kind!=='mcp'?t.description:WHAT[t.kind])}</p><dl class="facts">${facts.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}<dt>${(t.locations||[]).length>1?'Files':'File'}</dt><dd>${locs}</dd></dl>${removalNote(t)}${issues}${skillHistory(t)}${body}`;
+  $('drawer-body').innerHTML=`<div class="agents">${isNew(t)?'<span class="badge-new">New</span>':''}${scopeChip(t)}</div><h2 id="drawer-title">${esc(t.kind==='rule'?t.title:t.name)}</h2><p class="what">${esc(t.description&&t.kind!=='mcp'?t.description:WHAT[t.kind])}</p><dl class="facts">${facts.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}<dt>${(t.locations||[]).length>1?'Files':'File'}</dt><dd>${locs}</dd></dl>${share}${removalNote(t)}${issues}${skillHistory(t)}${body}`;
   if(!$('drawer').open)$('drawer').showModal();
   $('drawer').scrollTop=0;
 }
@@ -1064,6 +1077,8 @@ document.addEventListener('click',e=>{
   else if(d.cancelFix){b.closest('.fix').remove();}
   else if(d.runReview){b.disabled=true;b.textContent='Reviewing… this can take a minute';callApi('/api/review',{});}
   else if(d.cancelLine){b.closest('.line-confirm').remove();}
+  else if(d.removeLink){b.disabled=true;callApi('/api/remove-link',{finding:d.removeLink,path:d.path});}
+  else if(d.shareSkill){b.disabled=true;callApi('/api/share-skill',{id:d.shareSkill,agents:JSON.parse(d.agents)});}
   else if(d.trash||d.disablePlugin){confirmThen(b,d.trash?()=>callApi('/api/trash',{id:d.trash,path:d.path}):()=>callApi('/api/disable-plugin',{id:d.disablePlugin}));}
   else if(d.dismiss){const id=d.dismiss;dismissed.add(id);saveDismissed();state.open.delete(id);afterFindingChange();showToast('Ignored. It no longer counts.',()=>{dismissed.delete(id);saveDismissed();state.open.add(id);navCounts();render();});}
   else if(d.restore){dismissed.delete(d.restore);saveDismissed();afterFindingChange();showToast('Brought back',null);}
