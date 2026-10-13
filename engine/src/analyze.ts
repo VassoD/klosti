@@ -10,7 +10,10 @@ const AGENTS: Agent[] = ['Claude', 'Codex', 'Cursor', 'Gemini', 'Vibe'];
 const SHARED_SKILLS = join(HOME, '.agents', 'skills');
 /** Where each agent looks for personal skills, when it does not read ~/.agents/skills itself. */
 const SKILL_HOMES: Partial<Record<Agent, string>> = { Claude: join(HOME, '.claude', 'skills'), Gemini: join(HOME, '.gemini', 'skills'), Vibe: join(HOME, '.vibe', 'skills') };
-const REVIEWED_AGENTS: Agent[] = ['Claude', 'Codex'];
+const REVIEWED_AGENTS: Agent[] = ['Claude', 'Codex', 'Vibe'];
+const AGENT_NAMES: Partial<Record<Agent, string>> = { Claude: 'Claude', Codex: 'Codex', Vibe: 'Mistral Vibe' };
+const agentName = (agent: Agent): string => AGENT_NAMES[agent] ?? agent;
+const listNames = (agents: Agent[]): string => { const names = agents.map(agentName); return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`; };
 /** Claude Code namespaces these as plugin:skill or anthropic-skills:skill, so they never clash by name. */
 const NAMESPACED_SOURCES = new Set(['plugin', 'synced']);
 /** Bundled commands seen in Claude Code 2.1.296. A skill with the same name replaces the bundled one. */
@@ -21,6 +24,7 @@ const MAX_SIMILAR_PAIRS = 60;
 /**
  * Claude Code keeps skill descriptions within 1% of the context window, about 8,000 characters on a 200k model.
  * Codex uses 2% of the window, or 8,000 characters when the window is unknown. Both are estimates; /doctor shows the real figure.
+ * Vibe documents no listing budget, so it gets no estimate.
  */
 const LISTING_BUDGET_CHARS: Partial<Record<Agent, number>> = { Claude: 8000, Codex: 8000 };
 const DESCRIPTION_CAP_CHARS = 1536;
@@ -89,9 +93,12 @@ function claudeImportClosure(files: FileRecord[], byPath: Map<string, FileRecord
 
 function ruleAgents(f: FileRecord, byPath: Map<string, FileRecord>, reached: Set<string>): Agent[] {
   if (f.family === 'Codex / shared') {
+    // ~/.vibe/AGENTS.md is Vibe's own global file, not Codex's.
+    if (isInside(f.path, join(HOME, '.vibe'))) return ['Vibe'];
     // Claude reads a project AGENTS.md only when no CLAUDE.md sits there or above; never Codex's global file.
     const readsDirectly = f.scope !== 'User-wide' && !hasClaudeMdAbove(dirname(f.path), byPath);
-    return reached.has(f.path) || readsDirectly ? ['Codex', 'Claude'] : ['Codex'];
+    const agents: Agent[] = reached.has(f.path) || readsDirectly ? ['Codex', 'Claude'] : ['Codex'];
+    return sortedStrings(new Set([...agents, ...(f.readers ?? [])])) as Agent[];
   }
   if (f.family === 'Referenced document') return reached.has(f.path) ? ['Claude'] : [];
   return [f.family as Agent];
@@ -242,6 +249,16 @@ function label(t: Thing): string {
 }
 const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** What each agent does with two skills of the same name, per its docs. */
+function sameNameHappens(agent: Agent, a: Thing, b: Thing): string {
+  if (agent === 'Claude') { const [w] = claudeNameWinner(a, b); return `Claude always loads the ${label(w)} version.`; }
+  if (agent === 'Codex') return 'Codex does not merge or rank skills with the same name. Both can appear in the skill list, so either one may be picked.';
+  return `${agentName(agent)} has no documented rule for two skills with the same name, so either one may be picked.`;
+}
+
+/** The documented way to turn one skill off, for agents that have one. */
+const disableTip = (agent: Agent): string => (agent === 'Codex' ? 'In Codex you can disable one with [[skills.config]] in ~/.codex/config.toml.' : agent === 'Vibe' ? 'In Mistral Vibe you can hide one with disabled_skills in ~/.vibe/config.toml.' : '');
+
 /** Personal beats project; a skill beats a command with the same name. */
 function claudeNameWinner(a: Thing, b: Thing): [Thing, Thing] {
   const rank = (t: Thing): number => (t.global ? 0 : 2) + (t.kind === 'skill' ? 0 : 1);
@@ -264,9 +281,8 @@ function sameNameFindings(things: Thing[], projectsById: Map<string, ProjectRef>
         happens = `Typing /${plainName(a)} or an automatic match always loads the ${label(w)} version. The ${label(loser)} one is hidden.`;
         todo = `Rename one of them, or delete the ${label(loser)} copy if it is outdated.`;
       } else {
-        const agent = together.agents[0];
-        happens = agent === 'Codex' ? 'Codex does not merge or rank skills with the same name. Both can appear in the skill list, so either one may be picked.' : `${agent} has no documented rule for two skills with the same name, so either one may be picked.`;
-        todo = `Rename one of them so you can tell which one runs.${agent === 'Codex' ? ' You can also disable one with [[skills.config]] in ~/.codex/config.toml.' : ''}`;
+        happens = together.agents.map(agent => sameNameHappens(agent, a, b)).join(' ');
+        todo = ['Rename one of them so you can tell which one runs.', ...together.agents.map(disableTip).filter(Boolean)].join(' ');
       }
       out.push(finding('same-name', 'high', `Two skills named “${plainName(a)}”`, `${capitalize(label(a))} and ${label(b)} define the same name.`, happens, todo, [a.id, b.id], together, projectsById, { winner: winner?.id ?? null }));
     }
@@ -318,7 +334,9 @@ function reviewedFindings(things: Thing[], contexts: SkillContext[], projectsByI
   return out;
 }
 
-const similarHappens = (together: Together): string => (together.agents.length === 1 && together.agents[0] === 'Codex' ? 'Codex lists both and picks by description. There is no documented tie-break.' : 'Claude reads both descriptions and picks the closest match. There is no documented tie-break, so it may pick either one or load both.');
+const similarHappens = (together: Together): string => together.agents.map(agent => (agent === 'Claude'
+  ? 'Claude reads both descriptions and picks the closest match. There is no documented tie-break, so it may pick either one or load both.'
+  : `${agentName(agent)} picks skills by description. There is no documented tie-break, so it may pick either one.`)).join(' ');
 
 /** Offline fallback for places the AI review has not covered yet: word overlap between names and descriptions. */
 function similarFindings(things: Thing[], contexts: SkillContext[], projectsById: Map<string, ProjectRef>, judgements: Judgements): Finding[] {
@@ -352,15 +370,21 @@ function similarFindings(things: Thing[], contexts: SkillContext[], projectsById
 
 function mcpFindings(things: Thing[], projectsById: Map<string, ProjectRef>): Finding[] {
   const out: Finding[] = [];
-  const servers = things.filter(t => t.kind === 'mcp' && t.agents.length === 1 && t.agents[0] === 'Claude');
+  const servers = things.filter(t => t.kind === 'mcp' && t.agents.length === 1);
   servers.forEach((a, i) => {
     for (const b of servers.slice(i + 1)) {
-      if (a.name !== b.name) continue;
+      if (a.name !== b.name || a.agents[0] !== b.agents[0]) continue;
       const together = visibleTogether(a, b);
       if (!together) continue;
-      const [winner, loser] = [a, b].sort((x, y) => (MCP_PRECEDENCE[x.mcpScope ?? ''] ?? 9) - (MCP_PRECEDENCE[y.mcpScope ?? ''] ?? 9)) as [Thing, Thing];
+      const agent = a.agents[0]!;
       const same = a.sha === b.sha;
-      out.push(finding('same-name', same ? 'low' : 'medium', `MCP server “${a.name}” is configured twice`, `Defined at ${winner.mcpScope} scope and at ${loser.mcpScope} scope.`, `Claude Code uses the whole ${winner.mcpScope} entry and ignores the ${loser.mcpScope} one. Settings are not merged.${same ? ' Both point to the same place.' : ' They point to different places.'}`, 'Remove the one you no longer need so there is a single source of truth.', [winner.id, loser.id], together, projectsById, { winner: winner.id }));
+      const places = same ? ' Both point to the same place.' : ' They point to different places.';
+      if (agent === 'Claude') {
+        const [winner, loser] = [a, b].sort((x, y) => (MCP_PRECEDENCE[x.mcpScope ?? ''] ?? 9) - (MCP_PRECEDENCE[y.mcpScope ?? ''] ?? 9)) as [Thing, Thing];
+        out.push(finding('same-name', same ? 'low' : 'medium', `MCP server “${a.name}” is configured twice`, `Defined at ${winner.mcpScope} scope and at ${loser.mcpScope} scope.`, `Claude Code uses the whole ${winner.mcpScope} entry and ignores the ${loser.mcpScope} one. Settings are not merged.${places}`, 'Remove the one you no longer need so there is a single source of truth.', [winner.id, loser.id], together, projectsById, { winner: winner.id }));
+        continue;
+      }
+      out.push(finding('same-name', same ? 'low' : 'medium', `MCP server “${a.name}” is configured twice for ${agentName(agent)}`, `Defined at ${a.mcpScope} scope and at ${b.mcpScope} scope.`, `${agentName(agent)}'s docs do not say which entry wins when a name is repeated.${places}`, 'Remove the one you no longer need so there is a single source of truth.', [a.id, b.id], together, projectsById));
     }
   });
   return out;
@@ -412,9 +436,16 @@ function instructionFindings(things: Thing[], stacks: InstructionStack[], projec
   return stacks.flatMap(stack => {
     const members = [...stack.rules, ...stack.skills].flatMap(id => (byId.has(id) ? [byId.get(id)!] : []));
     const together: Together = { agents: [stack.agent], where: stack.project ? 'projects' : 'everywhere', projects: stack.project ? [stack.project] : [] };
-    return conflictFindings(judgements.instructions[stack.key]?.conflicts ?? [], members, together, projectsById, 'A skill contradicts your instructions', `When ${stack.agent} uses the skill, both instructions are in the same session and it may follow either one.`);
+    return conflictFindings(judgements.instructions[stack.key]?.conflicts ?? [], members, together, projectsById, 'A skill contradicts your instructions', `When ${agentName(stack.agent)} uses the skill, both instructions are in the same session and it may follow either one.`);
   });
 }
+
+/** What each agent's docs say happens when two loaded rule files contradict. */
+const RULE_ORDER_HAPPENS: Partial<Record<Agent, string>> = {
+  Claude: 'Both rules load into the same session. When instructions contradict, Claude may pick either one.',
+  Codex: 'Both rules load into the same session. Codex reads them from the root down, so the file closer to your folder usually wins.',
+  Vibe: 'Both rules load into the same session. Mistral Vibe gives closer folders priority, so the file closer to your folder usually wins.',
+};
 
 function ruleFindings(things: Thing[], projects: ProjectRef[], projectsById: Map<string, ProjectRef>, judgements: Judgements): { findings: Finding[]; stacks: RuleStack[] } {
   const out: Finding[] = [];
@@ -426,14 +457,16 @@ function ruleFindings(things: Thing[], projects: ProjectRef[], projectsById: Map
       const key = sha256Hex(sortedStrings(stack.map(t => t.sha)).join('|') + agent).slice(0, 16);
       stacks.push({ key, project: p.id, agent, rules: stack.map(t => t.id) });
       const together: Together = { agents: [agent], where: 'projects', projects: [p.id] };
-      out.push(...conflictFindings(judgements.rules[key]?.conflicts ?? [], stack, together, projectsById, 'Rules that contradict', 'Both rules load into the same session. When instructions contradict, Claude may pick either one.'));
+      out.push(...conflictFindings(judgements.rules[key]?.conflicts ?? [], stack, together, projectsById, 'Rules that contradict', RULE_ORDER_HAPPENS[agent] ?? `Both rules load into the same session. ${agentName(agent)}'s docs do not say which one wins.`));
     }
     const inProject = (t: Thing): boolean => t.projects.some(x => x.id === p.id);
     const claudeMd = things.filter(t => t.kind === 'rule' && t.family === 'Claude' && inProject(t) && !t.empty);
     const agentsMd = things.filter(t => t.kind === 'rule' && t.family === 'Codex / shared' && inProject(t) && !t.agents.includes('Claude') && !t.empty);
     if (claudeMd.length && agentsMd.length) {
-      const together: Together = { agents: ['Claude', 'Codex'], where: 'projects', projects: [p.id] };
-      out.push(finding('drift', 'medium', `Claude and Codex get different instructions in ${p.name}`, 'This project has both a CLAUDE.md and an AGENTS.md, and CLAUDE.md does not import AGENTS.md.', 'Claude reads CLAUDE.md and ignores AGENTS.md here. Codex reads only AGENTS.md. The two agents follow different rules in the same repo.', 'If they should match, keep one file and add a line with @AGENTS.md to CLAUDE.md.', [...claudeMd, ...agentsMd].map(t => t.id), together, projectsById));
+      const readers = sortedStrings(new Set(agentsMd.flatMap(t => t.agents))) as Agent[];
+      const together: Together = { agents: sortedStrings(new Set<string>(['Claude', ...readers])) as Agent[], where: 'projects', projects: [p.id] };
+      const verb = readers.length > 1 ? 'read' : 'reads';
+      out.push(finding('drift', 'medium', `${listNames(['Claude', ...readers.filter(r => r !== 'Claude')])} get different instructions in ${p.name}`, 'This project has both a CLAUDE.md and an AGENTS.md, and CLAUDE.md does not import AGENTS.md.', `Claude reads CLAUDE.md and ignores AGENTS.md here. ${listNames(readers)} ${verb} only AGENTS.md. They follow different rules in the same repo.`, 'If they should match, keep one file and add a line with @AGENTS.md to CLAUDE.md.', [...claudeMd, ...agentsMd].map(t => t.id), together, projectsById));
     }
   }
   return { findings: out, stacks };
@@ -443,7 +476,8 @@ function listingFindings(things: Thing[], projects: ProjectRef[], projectsById: 
   const out: Finding[] = [];
   const budgets: ListingBudget[] = [];
   for (const agent of REVIEWED_AGENTS) {
-    const limit = LISTING_BUDGET_CHARS[agent] ?? 0;
+    const limit = LISTING_BUDGET_CHARS[agent];
+    if (!limit) continue;
     for (const pid of [null, ...projects.map(p => p.id)]) {
       const skills = things.filter(t => (t.kind === 'skill' || t.kind === 'command') && t.agents.includes(agent) && !t.manualOnly && (t.global || (pid !== null && t.projects.some(p => p.id === pid))));
       const chars = skills.reduce((s, t) => s + t.name.length + Math.min(t.description.length, DESCRIPTION_CAP_CHARS), 0);
@@ -455,7 +489,7 @@ function listingFindings(things: Thing[], projects: ProjectRef[], projectsById: 
       const over = mine.filter(b => b.chars > limit);
       const together: Together = { agents: [agent], where: over.some(b => b.project === null) ? 'everywhere' : 'projects', projects: over.map(b => b.project).filter((p): p is string => !!p) };
       const check = agent === 'Claude' ? 'Run /doctor in Claude Code to see the real figure for your model.' : 'The budget is larger on models with a bigger context window.';
-      out.push(finding('budget', 'medium', `${agent} may not see every skill description`, `Up to ${worst.count} skills with about ${worst.chars.toLocaleString('en-US')} characters of descriptions. The estimated budget is ${limit.toLocaleString('en-US')} characters on a 200k-context model.`, `${agent} always keeps every skill name, but drops descriptions once the list is too long${agent === 'Claude' ? ', starting with the skills you use least.' : '.'} A skill without its description is much less likely to be picked automatically. ${check}`, 'Disable plugins you do not use, or mark rarely used skills as manual only with disable-model-invocation: true.', [], together, projectsById, { estimate: true }));
+      out.push(finding('budget', 'medium', `${agent} may not see every skill description`, `Up to ${worst.count} skills with about ${worst.chars.toLocaleString('en-US')} characters of descriptions. The estimated budget is ${limit.toLocaleString('en-US')} characters on a 200k-context model.`, `${agent} always keeps every skill name, but drops descriptions once the list is too long${agent === 'Claude' ? ', starting with the skills you use least.' : '.'} A skill without its description is much less likely to be picked automatically. ${check}`, agent === 'Codex' ? 'Disable skills you do not use with [[skills.config]] in ~/.codex/config.toml, or set allow_implicit_invocation: false in a skill\'s agents/openai.yaml so it runs only when called.' : 'Disable plugins you do not use, or mark rarely used skills as manual only with disable-model-invocation: true.', [], together, projectsById, { estimate: true }));
     }
   }
   return { findings: out, budgets };
