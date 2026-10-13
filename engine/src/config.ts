@@ -5,14 +5,14 @@ import { dirname, join } from 'node:path';
 export const HOME = homedir();
 
 /** Folders where agents keep user-wide settings. Anything inside is "global". */
-export const AGENT_DIRS = ['.claude', '.codex', '.agents', '.cursor', '.gemini', '.windsurf', '.copilot', '.continue'];
+export const AGENT_DIRS = ['.claude', '.codex', '.agents', '.cursor', '.gemini', '.vibe', '.windsurf', '.copilot', '.continue'];
 
 /** Common places people keep code. Only the ones that exist are scanned. */
 export const DEFAULT_CODE_DIRS = ['side-projects', 'projets', 'projects', 'Projects', 'code', 'Code', 'dev', 'Developer', 'src', 'repos', 'work', 'GitHub', 'Documents'];
 
 export const EXCLUDED_DIRS = ['node_modules', '.git', 'vendor', '.venv', 'plugins', 'worktrees', 'cache', 'sessions', 'history', 'extensions', '.next', 'build', '.trash', 'vendor_imports', '.tmp', 'Library', '.Trash'];
 
-export const KNOWN_AGENTS = ['Claude', 'Codex', 'Cursor', 'Gemini'];
+export const KNOWN_AGENTS = ['Claude', 'Codex', 'Cursor', 'Gemini', 'Vibe'];
 
 const APP_SLUG = 'klosti';
 /** The name before the Klosti rebrand. Existing folders under it keep working. */
@@ -121,11 +121,11 @@ export const rootCandidates = (config: ResolvedConfig): string[] => [...new Set(
 export const CONFIG_PATH = CONFIG_FILE;
 
 /** Where each agent keeps its user-wide settings. A folder that exists means the agent is probably installed. */
-const AGENT_HOMES: Record<string, string> = { Claude: '.claude', Codex: '.codex', Cursor: '.cursor', Gemini: '.gemini' };
+export const AGENT_HOMES: Record<string, string> = { Claude: '.claude', Codex: '.codex', Cursor: '.cursor', Gemini: '.gemini', Vibe: '.vibe' };
 /** How far below a code folder the welcome screen looks for projects, for layouts like code/client/repo. */
 const PROJECT_SEARCH_DEPTH = 4;
 /** Files or folders that mark a project as having agent instructions. */
-const PROJECT_MARKERS = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md', '.claude', '.agents', '.cursor', '.cursorrules', '.codex'];
+const PROJECT_MARKERS = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md', '.claude', '.agents', '.cursor', '.cursorrules', '.codex', '.vibe'];
 
 export interface OnboardingChoices {
   agents: { name: string; found: boolean }[];

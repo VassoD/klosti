@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
-import { AGENT_DIRS, HOME, MANAGED_CLAUDE_MD, type ResolvedConfig } from './config.ts';
+import { AGENT_DIRS, expandPath, HOME, MANAGED_CLAUDE_MD, type ResolvedConfig } from './config.ts';
 import type { Agent, ChangeSummary, Extra, Extras, FileRecord, HistoryEntry, HookExtra, InstalledPlugin, Inventory, McpExtra, McpScope, MarkdownExtra, MemoryIndex, RuleFamily, Scope, SkillSource } from './types.ts';
 
 const RULE_NAMES = new Set(['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md', 'GEMINI.md', '.cursorrules', '.windsurfrules', 'copilot-instructions.md']);
@@ -20,6 +20,7 @@ const CLAUDE_MARKETPLACES = join(HOME, '.claude', 'plugins', 'known_marketplaces
 const CLAUDE_SETTINGS = join(HOME, '.claude', 'settings.json');
 const CODEX_CONFIG = join(HOME, '.codex', 'config.toml');
 const CODEX_PLUGIN_CACHE = join(HOME, '.codex', 'plugins', 'cache');
+const VIBE_DIR = join(HOME, '.vibe');
 const SECRET_ASSIGNMENT = /\b([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|AUTH)[A-Z0-9_]*)=\S+/gi;
 const LONG_TOKEN = /[A-Za-z0-9_-]{32,}/g;
 const PACKAGE_ARG = /^@?[a-z0-9][\w.-]*(\/[\w.-]+)?(@[\w.-]+)?$/i;
@@ -64,7 +65,7 @@ export function scopeOf(path: string): Scope {
 
 export function folderFor(path: string): string {
   const s = posix(path);
-  for (const marker of ['/.claude/', '/.agents/', '/.cursor/', '/.codex/', '/.windsurf/', '/.github/']) {
+  for (const marker of ['/.claude/', '/.agents/', '/.cursor/', '/.codex/', '/.vibe/', '/.windsurf/', '/.github/']) {
     if (s.includes(marker) && scopeOf(path) !== 'User-wide') return path.slice(0, s.indexOf(marker));
   }
   return dirname(path);
@@ -76,7 +77,39 @@ export function agentFor(path: string): Agent {
   if (s.includes('/.codex/') || s.includes('/.agents/')) return 'Codex';
   if (s.includes('/.cursor/')) return 'Cursor';
   if (s.includes('/.gemini/')) return 'Gemini';
+  if (s.includes('/.vibe/')) return 'Vibe';
   return 'Other';
+}
+
+/** What Mistral Vibe reads: its own skills folders, `skill_paths` from its config, and trusted projects. */
+export interface VibeSetup {
+  installed: boolean;
+  skillPaths: string[];
+  untrusted: string[];
+}
+
+export function vibeSetup(errors: string[]): VibeSetup {
+  if (!existsSync(VIBE_DIR)) return { installed: false, skillPaths: [], untrusted: [] };
+  const config = existsSync(join(VIBE_DIR, 'config.toml')) ? readToml(join(VIBE_DIR, 'config.toml'), errors) : {};
+  const trust = existsSync(join(VIBE_DIR, 'trusted_folders.toml')) ? readToml(join(VIBE_DIR, 'trusted_folders.toml'), errors) : {};
+  const paths = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && !!v.trim()).map(v => resolve(expandPath(v.trim()))) : []);
+  return { installed: true, skillPaths: paths(config.skill_paths), untrusted: paths(trust.untrusted) };
+}
+
+/**
+ * Every agent that loads a skill from this path. One folder can serve several agents: Codex and Vibe both
+ * read a project's .agents/skills, and Vibe reads any folder listed in its skill_paths.
+ */
+export function skillAgents(path: string, vibe: VibeSetup): Agent[] {
+  const s = posix(path);
+  const agents = new Set<Agent>([agentFor(path)]);
+  if (vibe.installed) {
+    // Vibe skips project skills in folders the user marked untrusted.
+    const projectShared = s.includes('/.agents/skills/') && scopeOf(path) !== 'User-wide' && !vibe.untrusted.some(u => isInside(path, u));
+    if (projectShared || vibe.skillPaths.some(p => isInside(path, p))) agents.add('Vibe');
+  }
+  if (agents.size > 1) agents.delete('Other');
+  return [...agents].sort();
 }
 
 export function record(path: string, kind?: RuleFamily): FileRecord {
@@ -230,16 +263,21 @@ function pluginHomepage(root: string, id: string, marketplaces: Record<string, u
   return source.source === 'github' && repo && /^[\w.-]+\/[\w.-]+$/.test(repo) ? `https://github.com/${repo}` : webUrl(source.url);
 }
 
-function skillRecord(path: string, excluded: Set<string>, plugin: PluginRoot | null, origins: Map<string, string>): FileRecord {
+function skillRecord(path: string, excluded: Set<string>, plugin: PluginRoot | null, origins: Map<string, string>, vibe: VibeSetup): FileRecord {
   const item = record(path, 'Skill');
   const meta = frontmatter(item.text);
   const dir = dirname(path);
   if (plugin) item.key = `plugin:${plugin.id}:${relative(plugin.root, path)}`;
   if (lstatSync(dir).isSymbolicLink()) item.linkTarget = realpathSync(path);
+  const real = realpathSync(path);
+  if (real !== path) item.realPath = real;
+  // Vibe loads skill_paths folders in every project, wherever they live.
+  if (!plugin && item.scope === 'Folder' && vibe.skillPaths.some(p => isInside(path, p))) { item.scope = 'User-wide'; item.folder = HOME; }
   item.skill = {
     name: meta.name || basename(dir),
     description: meta.description ?? '',
     agent: plugin ? plugin.agent : agentFor(path),
+    agents: plugin ? [plugin.agent] : skillAgents(path, vibe),
     source: skillSource(path, plugin),
     origin: plugin ? plugin.id : origins.get(`${item.folder}\u0000${basename(dir)}`) ?? null,
     plugin: plugin ? { id: plugin.id, version: plugin.version, installedAt: plugin.installedAt } : null,
@@ -419,6 +457,9 @@ const allExtras = (extras: Partial<Extras> | undefined): Extra[] => Object.value
 const trackedKind = (x: Tracked): string => ('family' in x ? (x.family === 'Skill' ? 'skill' : 'rule') : x.kind);
 const trackedName = (x: Tracked): string => ('family' in x ? (x.skill?.name ?? basename(x.path)) : x.name);
 const trackedAgent = (x: Tracked): string => ('family' in x ? (x.skill?.agent ?? x.family) : x.agent);
+const trackedAgents = (x: Tracked): string[] => ('family' in x && x.skill?.agents ? x.skill.agents : [trackedAgent(x)]);
+/** A skill reached through links is one file, so every path to it shares this key. */
+const realKey = (x: Tracked): string => ('family' in x && x.family === 'Skill' ? x.realPath ?? x.path : x.key);
 
 /** Carries first-seen dates across scans and returns what changed since the last one. */
 function trackChanges(previous: Partial<Inventory>, current: Tracked[], now: string): Omit<HistoryEntry, 'at'> {
@@ -430,12 +471,21 @@ function trackChanges(previous: Partial<Inventory>, current: Tracked[], now: str
     if (before && before.sha256 !== item.sha256) item.changedAt = now;
   }
   if (!previous.extrasTracked) return { added: [], removed: [], changed: [] };
-  const summary = (x: Tracked): ChangeSummary => ({ key: x.key, kind: trackedKind(x), name: trackedName(x), agent: trackedAgent(x), path: x.path });
+  // One line per real file: the original path first, then the links to it.
+  const summarize = (items: Tracked[]): ChangeSummary[] => {
+    const groups = new Map<string, Tracked[]>();
+    for (const x of items) groups.set(realKey(x), [...(groups.get(realKey(x)) ?? []), x]);
+    return [...groups].map(([real, group]) => {
+      const sorted = [...group].sort((a, b) => Number(b.path === real) - Number(a.path === real) || a.path.localeCompare(b.path));
+      const first = sorted[0]!;
+      return { key: first.key, kind: trackedKind(first), name: trackedName(first), agent: trackedAgent(first), path: first.path, agents: [...new Set(sorted.flatMap(trackedAgents))].sort(), paths: sorted.map(x => x.path) };
+    });
+  };
   const now_ = new Map(current.map(x => [x.key, x]));
   return {
-    added: [...now_].filter(([k]) => !old.has(k)).map(([, x]) => summary(x)),
-    removed: [...old].filter(([k]) => !now_.has(k)).map(([, x]) => summary(x)),
-    changed: [...now_].filter(([k, x]) => old.has(k) && old.get(k)!.sha256 !== x.sha256).map(([, x]) => summary(x)),
+    added: summarize([...now_].filter(([k]) => !old.has(k)).map(([, x]) => x)),
+    removed: summarize([...old].filter(([k]) => !now_.has(k)).map(([, x]) => x)),
+    changed: summarize([...now_].filter(([k, x]) => old.has(k) && old.get(k)!.sha256 !== x.sha256).map(([, x]) => x)),
   };
 }
 
@@ -479,7 +529,9 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   const now = nowIso();
   const roots = [...config.codeRoots, ...config.agentRoots].filter(r => !config.ignored.includes(r));
   const excluded = new Set(config.excluded);
-  const found = discover(roots, config.excluded, errors, config.ignored);
+  const vibe = vibeSetup(errors);
+  const vibeRoots = vibe.skillPaths.filter(p => existsSync(p) && !roots.some(r => isInside(p, r)) && !config.ignored.includes(p));
+  const found = discover([...roots, ...vibeRoots], config.excluded, errors, config.ignored);
   for (const name of HOME_RULE_FILES) if (existsSync(join(HOME, name))) found.rules.add(join(HOME, name));
   if (MANAGED_CLAUDE_MD && existsSync(MANAGED_CLAUDE_MD)) found.rules.add(MANAGED_CLAUDE_MD);
   const files: FileRecord[] = [];
@@ -487,14 +539,14 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   const byPath = resolveImports(files, errors);
   const origins = skillOrigins(found.config.get('skills-lock') ?? [], errors);
   const skills: FileRecord[] = [];
-  for (const p of [...found.skills].sort()) { try { skills.push(skillRecord(p, excluded, null, origins)); } catch (error) { errors.push(String(error)); } }
+  for (const p of [...found.skills].sort()) { try { skills.push(skillRecord(p, excluded, null, origins, vibe)); } catch (error) { errors.push(String(error)); } }
   const plugins = enabledPlugins(errors);
   for (const plugin of plugins) {
     const dir = join(plugin.root, 'skills');
     if (!existsSync(dir)) continue;
     for (const child of readdirSync(dir).sort()) {
       const p = join(dir, child, SKILL_NAME);
-      if (existsSync(p)) { try { skills.push(skillRecord(p, excluded, plugin, origins)); } catch (error) { errors.push(String(error)); } }
+      if (existsSync(p)) { try { skills.push(skillRecord(p, excluded, plugin, origins, vibe)); } catch (error) { errors.push(String(error)); } }
     }
   }
   const items: FileRecord[] = [...byPath.values(), ...skills];

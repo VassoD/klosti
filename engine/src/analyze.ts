@@ -3,9 +3,13 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { AGENT_DIRS, HOME } from './config.ts';
 import { stripFrontmatter } from './scan.ts';
-import type { Agent, Analysis, FileRecord, Finding, ImportRef, InstructionStack, Inventory, Judgements, ListingBudget, Location, ProjectRef, Quote, RuleConflict, RuleStack, SkillContext, Thing } from './types.ts';
+import type { Agent, Analysis, FileRecord, Finding, ImportRef, InstructionStack, Inventory, Judgements, ListingBudget, Location, ProjectRef, Quote, RuleConflict, RuleStack, ShareTarget, SkillContext, Thing } from './types.ts';
 
-const AGENTS: Agent[] = ['Claude', 'Codex', 'Cursor', 'Gemini'];
+const AGENTS: Agent[] = ['Claude', 'Codex', 'Cursor', 'Gemini', 'Vibe'];
+/** The shared folder for personal skills. Codex reads it; other agents need a link to each skill. */
+const SHARED_SKILLS = join(HOME, '.agents', 'skills');
+/** Where each agent looks for personal skills, when it does not read ~/.agents/skills itself. */
+const SKILL_HOMES: Partial<Record<Agent, string>> = { Claude: join(HOME, '.claude', 'skills'), Gemini: join(HOME, '.gemini', 'skills'), Vibe: join(HOME, '.vibe', 'skills') };
 const REVIEWED_AGENTS: Agent[] = ['Claude', 'Codex'];
 /** Claude Code namespaces these as plugin:skill or anthropic-skills:skill, so they never clash by name. */
 const NAMESPACED_SOURCES = new Set(['plugin', 'synced']);
@@ -112,7 +116,7 @@ function buildThings(data: Inventory, projectRoots: string[]): { things: Thing[]
   for (const f of data.files) {
     if (f.family !== 'Skill' || !f.skill) continue;
     const sk = f.skill;
-    add(f, sk.plugin?.id ?? null, { kind: 'skill', name: sk.name, title: sk.name, agents: [sk.agent], description: sk.description, body: stripFrontmatter(f.text), sha: f.sha256, source: sk.source, origin: sk.origin, version: sk.plugin?.version ?? null, supportFiles: sk.supportFiles, manualOnly: sk.manualOnly, hiddenFromMenu: sk.hiddenFromMenu, linkTarget: f.linkTarget ?? null });
+    add(f, sk.plugin?.id ?? null, { kind: 'skill', name: sk.name, title: sk.name, agents: sk.agents ?? [sk.agent], description: sk.description, body: stripFrontmatter(f.text), sha: f.sha256, source: sk.source, origin: sk.origin, version: sk.plugin?.version ?? null, supportFiles: sk.supportFiles, manualOnly: sk.manualOnly, hiddenFromMenu: sk.hiddenFromMenu, linkTarget: f.linkTarget ?? null, realPath: f.realPath ?? null });
   }
   const extras = data.extras;
   for (const x of [...extras.commands, ...extras.subagents, ...extras.outputStyles]) {
@@ -133,8 +137,22 @@ function buildThings(data: Inventory, projectRoots: string[]): { things: Thing[]
     for (const l of t.locations) if (l.project) l.project.name = projects.get(l.project.id)?.name ?? l.project.name;
     t.global = !t.projects.length;
     t.id = `${t.kind}-${sha256Hex(sortedStrings(t.keys).join('|')).slice(0, 12)}`;
+    const share = shareTargets(t);
+    if (share.length) t.share = share;
   }
   return { things, projects: [...projects.values()].sort((a, b) => cmp(a.name.toLowerCase(), b.name.toLowerCase())) };
+}
+
+/** Agents that do not load a skill kept in ~/.agents/skills yet, with the link that would add it. Only agents found on this computer. */
+function shareTargets(t: Thing): ShareTarget[] {
+  if (t.kind !== 'skill' || t.plugin) return [];
+  const file = t.locations.map(l => l.realPath ?? l.path).find(p => dirname(dirname(p)) === SHARED_SKILLS);
+  if (!file) return [];
+  const source = dirname(file);
+  const seen = new Set(t.locations.filter(l => !l.project).flatMap(l => l.agents));
+  return (Object.entries(SKILL_HOMES) as [Agent, string][])
+    .filter(([agent, home]) => !seen.has(agent) && existsSync(dirname(home)))
+    .map(([agent, home]) => ({ agent, link: join(home, basename(source)), source }));
 }
 
 const sameProject = (a: Omit<ProjectRef, 'name'>, b: Omit<ProjectRef, 'name'>): boolean => a.id === b.id && a.path === b.path && a.subpath === b.subpath;
@@ -146,7 +164,7 @@ function mergeCopies(drafts: Draft[]): Thing[] {
   for (const { project, ...draft } of drafts) {
     const key = (draft.kind === 'rule' || draft.kind === 'skill') && !draft.empty ? `${draft.kind}\u0000${draft.sha}` : null;
     const projectRef: ProjectRef | null = project ? { ...project, name: basename(project.path) } : null;
-    const location: Location = { path: draft.paths[0] ?? '', agents: draft.agents, project: projectRef ? { ...projectRef } : null, source: draft.source ?? null, linkTarget: draft.linkTarget ?? null };
+    const location: Location = { path: draft.paths[0] ?? '', agents: draft.agents, project: projectRef ? { ...projectRef } : null, source: draft.source ?? null, linkTarget: draft.linkTarget ?? null, realPath: draft.realPath ?? null };
     const existing = key ? merged.get(key) : undefined;
     if (existing) {
       existing.paths.push(...draft.paths);
@@ -443,6 +461,28 @@ function listingFindings(things: Thing[], projects: ProjectRef[], projectsById: 
   return { findings: out, budgets };
 }
 
+/** One agent reaching the same skill file through two paths, such as a leftover link in an older skills folder. */
+function listedTwiceFindings(things: Thing[], projectsById: Map<string, ProjectRef>): Finding[] {
+  const out: Finding[] = [];
+  for (const t of things) {
+    if (t.kind !== 'skill' || t.locations.length < 2) continue;
+    const byFile = new Map<string, Location[]>();
+    for (const l of t.locations) byFile.set(l.realPath ?? l.path, [...(byFile.get(l.realPath ?? l.path) ?? []), l]);
+    for (const locations of byFile.values()) {
+      const twice = AGENTS.filter(a => locations.filter(l => l.agents.includes(a)).length > 1);
+      if (!twice.length) continue;
+      // A link can go only when every agent it serves still reaches the file another way.
+      const extra = locations.filter(l => l.linkTarget && l.agents.every(a => locations.some(o => o !== l && o.agents.includes(a)))).map(l => dirname(l.path));
+      const paths = locations.filter(l => l.agents.some(a => twice.includes(a))).map(l => short(dirname(l.path)));
+      const who = twice.join(' and ');
+      const together: Together = { agents: twice, where: t.global ? 'everywhere' : 'projects', projects: t.projects.map(p => p.id) };
+      const todo = extra.length ? `Remove the extra ${extra.length === 1 ? 'link' : 'links'}: ${extra.map(short).join(', ')}. The original folder stays.` : 'Remove one of the paths so each agent finds the skill once.';
+      out.push(finding('listed-twice', 'low', `${who} ${twice.length > 1 ? 'see' : 'sees'} “${plainName(t)}” twice`, `The same skill is reachable through ${paths.length} paths: ${paths.join(', ')}.`, `${who} may list it twice. Both entries load the same file, so nothing conflicts, but the extra entry takes room in the skill list.`, todo, [t.id], together, projectsById, { extraLinks: extra }));
+    }
+  }
+  return out;
+}
+
 function hookFindings(things: Thing[], projectsById: Map<string, ProjectRef>): Finding[] {
   return things.filter(t => t.kind === 'hook' && INJECTING_EVENTS.has(t.event ?? '') && (t.command ?? '').toLowerCase().includes('inject')).map(t => {
     const together: Together = { agents: t.agents, where: t.global ? 'everywhere' : 'projects', projects: t.projects.map(p => p.id) };
@@ -484,6 +524,7 @@ export function analyze(data: Inventory, judgements: Partial<Judgements> = {}): 
     ...instructionFindings(things, istacks, projectsById, cache),
     ...listing.findings,
     ...hookFindings(things, projectsById),
+    ...listedTwiceFindings(things, projectsById),
   ], projectsById);
   findings.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9) || cmp(a.kind, b.kind) || cmp(a.title, b.title));
   return { things, projects, findings, contexts, stacks: rules.stacks, instructionStacks: istacks, budgets: listing.budgets };

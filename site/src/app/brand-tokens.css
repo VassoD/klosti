@@ -1,13 +1,13 @@
 /* Generated from brand/tokens.css by brand/sync.mjs. Do not edit. */
 /* klosti brand tokens. The single source for the app (src/template.html) and the site (site/).
    Edit here, then run `node brand/sync.mjs`. Agent colors are validated with the dataviz
-   palette checker in this order (Claude, Codex, Cursor, Gemini) and always sit next to a name. */
+   palette checker in this order (Claude, Codex, Cursor, Gemini, Vibe) and always sit next to a name. */
 :root{color-scheme:light;
 --paper:#f6f4ef;--paper-2:#efece5;--card:#fffefb;--ink:#22201c;--ink-2:#4a463f;--muted:#7a756b;--line:#e3dfd5;--line-2:#d6d1c5;
 --clay:#bd5b3b;--clay-soft:#f6e6dd;--clay-ink:#9a4426;
 --high:#b2402c;--high-soft:#f7e4df;--medium:#a86a12;--medium-soft:#f6ecd9;--low:#5f6f82;--low-soft:#e8ecf1;--ok:#3f7d5c;--ok-soft:#e3f0e8;
---claude:#eb6834;--codex:#1baf7a;--cursor:#eda100;--gemini:#2a78d6;--other:#7a756b;
+--claude:#eb6834;--codex:#1baf7a;--cursor:#eda100;--gemini:#2a78d6;--vibe:#8a5bd4;--other:#7a756b;
 --serif:"Iowan Old Style",var(--font-serif-web,Charter),Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono",var(--font-mono-web,Menlo),monospace;
 --radius-lg:14px;--radius:9px;--radius-sm:6px}
-:root[data-theme=dark]{color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5}}
+:root[data-theme=dark]{color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5;--vibe:#a585e6}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--paper:#191816;--paper-2:#201f1c;--card:#252320;--ink:#ece8e0;--ink-2:#cbc5ba;--muted:#9d978b;--line:#353229;--line-2:#433f35;--clay:#e08a68;--clay-soft:#3a2a22;--clay-ink:#f0a98b;--high:#ec8a74;--high-soft:#3d2520;--medium:#e0b062;--medium-soft:#382d1a;--low:#9fb0c4;--low-soft:#262c34;--ok:#87c4a2;--ok-soft:#203229;--claude:#d95926;--codex:#199e70;--cursor:#c98500;--gemini:#3987e5;--vibe:#a585e6}}

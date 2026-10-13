@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { z } from 'zod';
@@ -66,26 +66,44 @@ export function locateLine(path: string, quote: string): { index: number; lines:
 
 // ---- backups --------------------------------------------------------------------
 
-interface BackupEntry { path: string; at: string }
+/** A copied file, or for links, where a removed link pointed (link) or that a link was added (created). */
+interface BackupEntry { path: string; at: string; link?: string; created?: boolean }
 
 function manifest(store: Store): Record<string, BackupEntry> {
   const file = join(store.backupsDir, 'manifest.json');
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as Record<string, BackupEntry> : {};
 }
 
-export function backUp(store: Store, path: string): string {
+function record(store: Store, entry: Omit<BackupEntry, 'at'>, copyFrom?: string): string {
   mkdirSync(store.backupsDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
   const id = `${stamp}-${randomBytes(3).toString('hex')}`;
-  copyFileSync(path, join(store.backupsDir, `${id}.bak`));
-  writeFileSync(join(store.backupsDir, 'manifest.json'), JSON.stringify({ ...manifest(store), [id]: { path, at: nowIso() } }, null, 2));
+  if (copyFrom) copyFileSync(copyFrom, join(store.backupsDir, `${id}.bak`));
+  writeFileSync(join(store.backupsDir, 'manifest.json'), JSON.stringify({ ...manifest(store), [id]: { ...entry, at: nowIso() } }, null, 2));
   return id;
 }
 
+export const backUp = (store: Store, path: string): string => record(store, { path }, path);
+
+/** Links have nothing to copy, so the backup keeps what undo needs to put them back or take them away. */
+export const backUpLink = (store: Store, path: string, change: { link: string } | { created: true }): string => record(store, { path, ...change });
+
 export function restore(store: Store, id: string): string {
   const entry = manifest(store)[id];
+  if (!entry) throw new ActionRefused('That backup is gone.');
+  if (entry.created) {
+    // Only ever a link Klosti made; a real folder that took its place is left alone.
+    if (isSymlink(entry.path)) unlinkSync(entry.path);
+    return entry.path;
+  }
+  if (entry.link) {
+    if (existsSync(entry.path) || isSymlink(entry.path)) throw new ActionRefused(`Something else is at ${short(entry.path)} now. Move it away first.`);
+    mkdirSync(dirname(entry.path), { recursive: true });
+    symlinkSync(entry.link, entry.path, 'dir');
+    return entry.path;
+  }
   const file = join(store.backupsDir, `${id}.bak`);
-  if (!entry || !existsSync(file)) throw new ActionRefused('That backup is gone.');
+  if (!existsSync(file)) throw new ActionRefused('That backup is gone.');
   copyFileSync(file, entry.path);
   return entry.path;
 }
@@ -435,6 +453,40 @@ Rules for your answer:
     this.config.agents.splice(0);
     this.config.onboarded = false;
     return { message: 'Deleted. Everything is in the Trash if you change your mind.' };
+  }
+
+  /** Deletes a skill folder link that only makes an agent list the skill twice. The folder it points to is not touched. */
+  removeLink(findingId: string, path: string): ActionReply {
+    const finding = this.finding(this.current(), findingId);
+    if (!finding.extraLinks?.includes(path)) throw new ActionRefused('That link is not part of this issue.');
+    if (!isSymlink(path) || !isInside(path, HOME)) throw new ActionRefused('Only a link inside your home folder can be removed here. Reload.');
+    const backup = backUpLink(this.store, path, { link: readlinkSync(path) });
+    unlinkSync(path);
+    this.store.logAction({ at: nowIso(), kind: 'remove-link', name: basename(path), files: [short(path)], backups: [backup] });
+    rescan(this.store, this.config);
+    return { message: `Removed the link ${short(path)}. The skill itself is untouched.`, undo: [backup] };
+  }
+
+  /** Links a skill kept in ~/.agents/skills into other agents' skills folders. Never copies or moves the skill. */
+  shareSkill(thingId: string, agents: string[]): ActionReply {
+    const thing = this.thing(this.current(), thingId);
+    const enabled = this.config.agents;
+    const targets = (thing.share ?? []).filter(s => agents.includes(s.agent) && (!enabled.length || enabled.includes(s.agent)));
+    if (!targets.length) throw new ActionRefused('Every agent you picked already sees this skill. Reload.');
+    for (const s of targets) {
+      if (!isInside(s.source, join(HOME, '.agents', 'skills')) || !existsSync(s.source) || !statSync(s.source).isDirectory()) throw new ActionRefused('The skill folder moved. Reload.');
+      if (!isInside(s.link, HOME)) throw new ActionRefused('Links can only be added inside your home folder.');
+      if (existsSync(s.link) || isSymlink(s.link)) throw new ActionRefused(`${short(s.link)} already exists. Remove it or rename the skill first.`);
+    }
+    const backups = targets.map(s => {
+      mkdirSync(dirname(s.link), { recursive: true });
+      symlinkSync(s.source, s.link, 'dir');
+      return backUpLink(this.store, s.link, { created: true });
+    });
+    const names = targets.map(s => (s.agent === 'Vibe' ? 'Mistral Vibe' : s.agent)).join(' and ');
+    this.store.logAction({ at: nowIso(), kind: 'share-skill', name: thing.name, summary: `Linked for ${names}.`, files: targets.map(s => short(s.link)), backups });
+    rescan(this.store, this.config);
+    return { message: `${thing.name} is now linked for ${names}. It loads in their next session.`, undo: backups };
   }
 
   disablePlugin(thingId: string): ActionReply {
