@@ -155,6 +155,10 @@ export interface Inventory {
   history: HistoryEntry[];
   memories: MemoryIndex[];
   limits: string[];
+  /** Agents whose command or app was found. Inventories from before this field only had home folders to go on. */
+  installedAgents?: Agent[];
+  /** Codex's project_doc_max_bytes and project_doc_fallback_filenames. */
+  codexDocs?: { maxBytes: number; fallbacks: string[] };
 }
 
 export interface ProjectRef {
@@ -235,7 +239,7 @@ export interface Quote {
 
 export interface Finding {
   id: string;
-  kind: 'same-name' | 'shadows-builtin' | 'overlap' | 'contradiction' | 'drift' | 'budget' | 'hidden' | 'listed-twice';
+  kind: 'same-name' | 'shadows-builtin' | 'overlap' | 'contradiction' | 'drift' | 'budget' | 'hidden' | 'listed-twice' | 'too-long';
   severity: Severity;
   title: string;
   summary: string;

@@ -14,7 +14,7 @@ const MAX_BODY_BYTES = 10_000;
 const WATCH_DEBOUNCE_MS = 4000;
 const PERIODIC_RESCAN_MS = 3 * 60 * 60 * 1000;
 /** Folders where installs land. Project skills are caught by the periodic rescan. */
-const WATCHED = ['.claude/skills', '.claude/plugins', '.codex/skills', '.codex/config.toml', '.agents/skills', '.gemini/skills', '.vibe/skills', '.vibe/config.toml'];
+const WATCHED = ['.claude/skills', '.claude/plugins', '.codex/skills', '.codex/config.toml', '.agents/skills', '.gemini/skills', '.vibe/skills', '.vibe/agents', '.vibe/config.toml'];
 
 const Body = z.object({
   finding: z.string().optional(), quote: z.number().optional(), dryRun: z.boolean().optional(), expect: z.string().optional(),

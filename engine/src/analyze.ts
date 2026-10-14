@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { AGENT_DIRS, HOME } from './config.ts';
-import { stripFrontmatter } from './scan.ts';
+import { CODEX_DOC_MAX_BYTES, stripFrontmatter } from './scan.ts';
 import type { Agent, Analysis, FileRecord, Finding, ImportRef, InstructionStack, Inventory, Judgements, ListingBudget, Location, ProjectRef, Quote, RuleConflict, RuleStack, ShareTarget, SkillContext, Thing } from './types.ts';
 
 const AGENTS: Agent[] = ['Claude', 'Codex', 'Cursor', 'Gemini', 'Vibe'];
@@ -91,13 +91,25 @@ function claudeImportClosure(files: FileRecord[], byPath: Map<string, FileRecord
   return reached;
 }
 
-function ruleAgents(f: FileRecord, byPath: Map<string, FileRecord>, reached: Set<string>): Agent[] {
+/**
+ * The one instruction file Codex loads from a folder: the first non-empty one of AGENTS.override.md, AGENTS.md,
+ * then the fallback names (the global folder has no fallbacks). Null when the folder has none.
+ */
+export function codexFileIn(dir: string, byPath: Map<string, FileRecord>, fallbacks: string[]): FileRecord | null {
+  const names = ['AGENTS.override.md', 'AGENTS.md', ...(dir === join(HOME, '.codex') ? [] : fallbacks)];
+  const present = names.map(n => byPath.get(join(dir, n))).filter((f): f is FileRecord => !!f);
+  // Codex skips empty files; an empty file still counts as Codex's when nothing else is there.
+  return present.find(f => !!f.text.trim()) ?? present[0] ?? null;
+}
+
+function ruleAgents(f: FileRecord, byPath: Map<string, FileRecord>, reached: Set<string>, fallbacks: string[]): Agent[] {
   if (f.family === 'Codex / shared') {
     // ~/.vibe/AGENTS.md is Vibe's own global file, not Codex's.
     if (isInside(f.path, join(HOME, '.vibe'))) return ['Vibe'];
-    // Claude reads a project AGENTS.md only when no CLAUDE.md sits there or above; never Codex's global file.
-    const readsDirectly = f.scope !== 'User-wide' && !hasClaudeMdAbove(dirname(f.path), byPath);
-    const agents: Agent[] = reached.has(f.path) || readsDirectly ? ['Codex', 'Claude'] : ['Codex'];
+    const codex = codexFileIn(dirname(f.path), byPath, fallbacks)?.path === f.path;
+    // Claude reads a project AGENTS.md only when no CLAUDE.md sits there or above; never Codex's global file or its other names.
+    const readsDirectly = basename(f.path) === 'AGENTS.md' && f.scope !== 'User-wide' && !hasClaudeMdAbove(dirname(f.path), byPath);
+    const agents: Agent[] = [...(codex ? ['Codex' as const] : []), ...(reached.has(f.path) || readsDirectly ? ['Claude' as const] : [])];
     return sortedStrings(new Set([...agents, ...(f.readers ?? [])])) as Agent[];
   }
   if (f.family === 'Referenced document') return reached.has(f.path) ? ['Claude'] : [];
@@ -109,6 +121,8 @@ const ruleTitle = (text: string, path: string): string => text.split(/\r?\n/).ma
 interface Draft extends Omit<Thing, 'id' | 'projects' | 'locations' | 'global'> { project: Omit<ProjectRef, 'name'> | null }
 
 function buildThings(data: Inventory, projectRoots: string[]): { things: Thing[]; projects: ProjectRef[] } {
+  // Older inventories have no install check, so a home folder stands in for it there.
+  const installed = (agent: Agent): boolean => (data.installedAgents ? data.installedAgents.includes(agent) : existsSync(dirname(SKILL_HOMES[agent] ?? '')));
   const files = data.files.filter(f => f.family !== 'Skill');
   const byPath = new Map(files.map(f => [f.path, f]));
   const reached = claudeImportClosure(files, byPath);
@@ -118,7 +132,7 @@ function buildThings(data: Inventory, projectRoots: string[]): { things: Thing[]
   };
   for (const f of files) {
     if (!f.text.trim() && f.family === 'Referenced document') continue;
-    add(f, null, { kind: 'rule', name: basename(f.path), title: ruleTitle(f.text, f.path), agents: ruleAgents(f, byPath, reached), description: '', body: f.text, sha: f.sha256, lines: f.lines, empty: !f.text.trim(), imports: f.imports as ImportRef[], family: f.family, loadsWhen: dirname(f.path) !== f.folder && f.scope !== 'User-wide' ? 'nested' : 'start' });
+    add(f, null, { kind: 'rule', name: basename(f.path), title: ruleTitle(f.text, f.path), agents: ruleAgents(f, byPath, reached, data.codexDocs?.fallbacks ?? []), description: '', body: f.text, sha: f.sha256, lines: f.lines, empty: !f.text.trim(), imports: f.imports as ImportRef[], family: f.family, loadsWhen: dirname(f.path) !== f.folder && f.scope !== 'User-wide' ? 'nested' : 'start' });
   }
   for (const f of data.files) {
     if (f.family !== 'Skill' || !f.skill) continue;
@@ -144,21 +158,21 @@ function buildThings(data: Inventory, projectRoots: string[]): { things: Thing[]
     for (const l of t.locations) if (l.project) l.project.name = projects.get(l.project.id)?.name ?? l.project.name;
     t.global = !t.projects.length;
     t.id = `${t.kind}-${sha256Hex(sortedStrings(t.keys).join('|')).slice(0, 12)}`;
-    const share = shareTargets(t);
+    const share = shareTargets(t, installed);
     if (share.length) t.share = share;
   }
   return { things, projects: [...projects.values()].sort((a, b) => cmp(a.name.toLowerCase(), b.name.toLowerCase())) };
 }
 
-/** Agents that do not load a skill kept in ~/.agents/skills yet, with the link that would add it. Only agents found on this computer. */
-function shareTargets(t: Thing): ShareTarget[] {
+/** Agents that do not load a skill kept in ~/.agents/skills yet, with the link that would add it. Only agents installed on this computer. */
+function shareTargets(t: Thing, installed: (agent: Agent) => boolean): ShareTarget[] {
   if (t.kind !== 'skill' || t.plugin) return [];
   const file = t.locations.map(l => l.realPath ?? l.path).find(p => dirname(dirname(p)) === SHARED_SKILLS);
   if (!file) return [];
   const source = dirname(file);
   const seen = new Set(t.locations.filter(l => !l.project).flatMap(l => l.agents));
   return (Object.entries(SKILL_HOMES) as [Agent, string][])
-    .filter(([agent, home]) => !seen.has(agent) && existsSync(dirname(home)))
+    .filter(([agent]) => !seen.has(agent) && installed(agent))
     .map(([agent, home]) => ({ agent, link: join(home, basename(source)), source }));
 }
 
@@ -472,6 +486,35 @@ function ruleFindings(things: Thing[], projects: ProjectRef[], projectsById: Map
   return { findings: out, stacks };
 }
 
+/**
+ * Codex joins one instruction file per folder, from its global file down to the folder you work in, and stops adding
+ * files once the combined size reaches project_doc_max_bytes. Reports the longest chain in each project that goes over.
+ */
+function codexSizeFindings(data: Inventory, things: Thing[], projectsById: Map<string, ProjectRef>): Finding[] {
+  const limit = data.codexDocs?.maxBytes ?? CODEX_DOC_MAX_BYTES;
+  const fallbacks = data.codexDocs?.fallbacks ?? [];
+  const rules = data.files.filter(f => f.family !== 'Skill');
+  const byPath = new Map(rules.map(f => [f.path, f]));
+  const globalFile = codexFileIn(join(HOME, '.codex'), byPath, fallbacks);
+  const worst = new Map<string, FileRecord[]>();
+  for (const f of rules) {
+    if (f.scope === 'User-wide' || codexFileIn(dirname(f.path), byPath, fallbacks)?.path !== f.path) continue;
+    const project = projectFor(f.scope, f.folder, projectRootsOf(data));
+    if (!project) continue;
+    const dirs = [project.path, ...relative(project.path, dirname(f.path)).split(sep).filter(Boolean).map((_, i, parts) => join(project.path, ...parts.slice(0, i + 1)))];
+    const chain = [globalFile, ...dirs.map(d => codexFileIn(d, byPath, fallbacks))].filter((x): x is FileRecord => !!x && !!x.text.trim());
+    const size = (c: FileRecord[]): number => c.reduce((n, x) => n + x.bytes, 0);
+    if (size(chain) > limit && size(chain) > size(worst.get(project.id) ?? [])) worst.set(project.id, chain);
+  }
+  const kib = (n: number): string => `${Math.round(n / 1024)} KiB`;
+  return [...worst].map(([pid, chain]) => {
+    const total = chain.reduce((n, x) => n + x.bytes, 0);
+    const ids = chain.map(f => things.find(t => t.paths.includes(f.path))?.id).filter((id): id is string => !!id);
+    const together: Together = { agents: ['Codex'], where: 'projects', projects: [pid] };
+    return finding('too-long', 'medium', `Codex does not read all of its instructions in ${projectsById.get(pid)?.name ?? basename(pid)}`, `The instruction files Codex joins here add up to about ${kib(total)}. Its limit (project_doc_max_bytes) is ${kib(limit)}.`, 'Codex joins the files from its global file down to the folder you work in and stops adding files once the combined size reaches the limit, so the files closest to your work are the ones it drops.', 'Shorten these files, or raise project_doc_max_bytes in ~/.codex/config.toml.', ids, together, projectsById);
+  });
+}
+
 function listingFindings(things: Thing[], projects: ProjectRef[], projectsById: Map<string, ProjectRef>): { findings: Finding[]; budgets: ListingBudget[] } {
   const out: Finding[] = [];
   const budgets: ListingBudget[] = [];
@@ -559,6 +602,7 @@ export function analyze(data: Inventory, judgements: Partial<Judgements> = {}): 
     ...listing.findings,
     ...hookFindings(things, projectsById),
     ...listedTwiceFindings(things, projectsById),
+    ...codexSizeFindings(data, things, projectsById),
   ], projectsById);
   findings.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9) || cmp(a.kind, b.kind) || cmp(a.title, b.title));
   return { things, projects, findings, contexts, stacks: rules.stacks, instructionStacks: istacks, budgets: listing.budgets };

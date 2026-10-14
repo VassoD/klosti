@@ -8,6 +8,8 @@ import { after, before, describe, it } from 'node:test';
 // Real paths, because macOS tmp folders sit behind a /var link.
 const home = realpathSync(mkdtempSync(join(tmpdir(), 'klosti-home-')));
 process.env.HOME = home;
+// Agents count as installed by their command, so look for commands only in the fixture.
+process.env.KLOSTI_SEARCH_PATH = join(home, 'bin');
 const { Actions } = await import('../src/actions.ts');
 const { analyze } = await import('../src/analyze.ts');
 const { AGENT_DIRS, EXCLUDED_DIRS } = await import('../src/config.ts');
@@ -33,6 +35,7 @@ before(() => {
   write(join(home, '.vibe', 'trusted_folders.toml'), `trusted = []\nuntrusted = ["${join(code, 'shady')}"]\n`);
   write(join(home, '.vibe', 'skills', 'vibe-only', 'SKILL.md'), skill('vibe-only', 'Only for Mistral Vibe'));
   mkdirSync(join(home, '.gemini'), { recursive: true });
+  write(join(home, 'bin', 'gemini'), '');
   for (const name of ['app', 'shady']) {
     mkdirSync(join(code, name, '.git'), { recursive: true });
     write(join(code, name, '.agents', 'skills', `${name}-deploy`, 'SKILL.md'), skill(`${name}-deploy`, `Deploy ${name}`));

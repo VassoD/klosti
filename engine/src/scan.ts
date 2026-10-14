@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
-import { AGENT_DIRS, expandPath, HOME, MANAGED_CLAUDE_MD, type ResolvedConfig } from './config.ts';
+import { AGENT_DIRS, expandPath, HOME, installedAgents, MANAGED_CLAUDE_MD, type ResolvedConfig } from './config.ts';
 import type { Agent, ChangeSummary, Extra, Extras, FileRecord, HistoryEntry, HookExtra, InstalledPlugin, Inventory, McpExtra, McpScope, MarkdownExtra, MemoryIndex, RuleFamily, Scope, SkillSource } from './types.ts';
 
 const RULE_NAMES = new Set(['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md', 'GEMINI.md', '.cursorrules', '.windsurfrules', 'copilot-instructions.md']);
@@ -81,6 +81,23 @@ export function agentFor(path: string): Agent {
   return 'Other';
 }
 
+/** Codex's instruction size cap and extra file names, from ~/.codex/config.toml. */
+export interface CodexDocs {
+  maxBytes: number;
+  fallbacks: string[];
+}
+
+/** Codex stops adding instruction files once their combined size reaches this, unless project_doc_max_bytes says otherwise. */
+export const CODEX_DOC_MAX_BYTES = 32 * 1024;
+
+export function codexDocs(errors: string[]): CodexDocs {
+  const config = existsSync(CODEX_CONFIG) ? readToml(CODEX_CONFIG, errors) : {};
+  const max = config.project_doc_max_bytes;
+  // Only plain file names: Codex looks for them in each folder, so a path would never match.
+  const fallbacks = Array.isArray(config.project_doc_fallback_filenames) ? config.project_doc_fallback_filenames.filter((v): v is string => typeof v === 'string' && !!v.trim() && !/[\\/]/.test(v)).map(v => v.trim()) : [];
+  return { maxBytes: typeof max === 'number' && max > 0 ? max : CODEX_DOC_MAX_BYTES, fallbacks };
+}
+
 /** What Mistral Vibe reads: its own skills folders, `skill_paths` from its config, and trusted projects. */
 export interface VibeSetup {
   installed: boolean;
@@ -120,7 +137,7 @@ export function record(path: string, kind?: RuleFamily): FileRecord {
 
 const isRule = (path: string): boolean => RULE_NAMES.has(basename(path)) || basename(path).endsWith('.instructions.md') || RULE_DIRS.some(d => posix(path).includes(d));
 
-type ConfigKind = 'skills-lock' | 'mcp-json' | 'claude-settings' | 'cursor-mcp' | 'codex-config' | 'vibe-config' | 'vibe-hooks' | 'command' | 'subagent' | 'output-style';
+type ConfigKind = 'skills-lock' | 'mcp-json' | 'claude-settings' | 'cursor-mcp' | 'codex-config' | 'vibe-config' | 'vibe-hooks' | 'vibe-agent' | 'command' | 'subagent' | 'output-style';
 
 function configKind(path: string): ConfigKind | null {
   const name = basename(path), parent = basename(dirname(path)), grand = basename(dirname(dirname(path)));
@@ -131,6 +148,7 @@ function configKind(path: string): ConfigKind | null {
   if (parent === '.codex' && (name === 'config.toml' || name === 'hooks.json')) return 'codex-config';
   if (parent === '.vibe' && name === 'config.toml') return 'vibe-config';
   if (parent === '.vibe' && name === 'hooks.toml') return 'vibe-hooks';
+  if (name.endsWith('.toml') && parent === 'agents' && grand === '.vibe') return 'vibe-agent';
   if (name.endsWith('.md') && posix(path).includes('/.claude/commands/')) return 'command';
   if (name.endsWith('.md') && parent === 'agents' && grand === '.claude') return 'subagent';
   if (name.endsWith('.md') && parent === 'output-styles' && grand === '.claude') return 'output-style';
@@ -153,7 +171,7 @@ function linkedSkillFiles(link: string, insideSkillsDir: boolean): string[] {
 }
 
 /** Walks roots like `rg --files --hidden --no-ignore`, pruning excluded folder names and not following symlinks. */
-export function discover(roots: string[], excluded: string[], errors: string[], ignored: string[] = []): Discovered {
+export function discover(roots: string[], excluded: string[], errors: string[], ignored: string[] = [], extraRules: ReadonlySet<string> = new Set()): Discovered {
   const found: Discovered = { rules: new Set(), skills: new Set(), config: new Map(), unreadable: [] };
   const skip = new Set(excluded);
   const skipPaths = new Set(ignored);
@@ -178,7 +196,7 @@ export function discover(roots: string[], excluded: string[], errors: string[], 
         }
       }
       if (entry.name === SKILL_NAME) found.skills.add(full);
-      else if (isRule(full)) found.rules.add(full);
+      else if (isRule(full) || extraRules.has(entry.name)) found.rules.add(full);
       else {
         const kind = configKind(full);
         if (kind) { if (!found.config.has(kind)) found.config.set(kind, new Set()); found.config.get(kind)!.add(full); }
@@ -426,6 +444,22 @@ function markdownItem(kind: MarkdownExtra['kind'], path: string, agent: Agent, p
   };
 }
 
+/** A Vibe agent profile (.vibe/agents/<name>.toml). Its name is the file name, as in vibe --agent <name>. */
+function vibeAgentItem(path: string, errors: string[]): MarkdownExtra {
+  const text = readFileSync(path, 'utf8');
+  const data = readToml(path, errors);
+  const description = asString(data.description) ?? (asString(data.display_name) ? `${asString(data.display_name)}.` : '');
+  // agent_type "agent" is a profile the user picks; "subagent" is one the model delegates to.
+  const picked = data.agent_type === 'agent' ? 'Picked with vibe --agent or Shift+Tab.' : '';
+  const tools = Array.isArray(data.enabled_tools) ? data.enabled_tools.filter((t): t is string => typeof t === 'string').join(', ') : null;
+  return {
+    kind: 'subagent', name: basename(path).replace(/\.toml$/, ''), agent: 'Vibe', path, ...base(path, { plugin: null }),
+    description: [description, picked].filter(Boolean).join(' '), model: asString(data.active_model), tools: tools || null,
+    text: [...text].slice(0, COMMAND_PREVIEW_CHARS).join(''), truncated: [...text].length > COMMAND_PREVIEW_CHARS,
+    key: `subagent:${path}`, sha256: sha256(text),
+  };
+}
+
 function pluginMarkdown(plugin: PluginRoot, folder: string, kind: MarkdownExtra['kind']): MarkdownExtra[] {
   const dir = join(plugin.root, folder);
   if (!existsSync(dir)) return [];
@@ -451,6 +485,7 @@ function collectExtras(config: Map<ConfigKind, Set<string>>, plugins: PluginRoot
   const vibeReads = (p: string): boolean => vibe.installed && (scopeOf(p) === 'User-wide' || !vibe.untrusted.some(u => isInside(p, u)));
   for (const p of files('vibe-config').filter(vibeReads)) extras.mcp.push(...mcpItems(byName(readToml(p, errors).mcp_servers), 'Vibe', p, scopeOf(p) === 'User-wide' ? 'user' : 'project'));
   for (const p of files('vibe-hooks').filter(vibeReads)) extras.hooks.push(...vibeHookItems(readToml(p, errors).hooks, p));
+  for (const p of files('vibe-agent').filter(vibeReads)) safely(() => extras.subagents.push(vibeAgentItem(p, errors)));
   if (existsSync(CLAUDE_JSON)) {
     const claudeJson = readJson(CLAUDE_JSON, errors);
     extras.mcp.push(...mcpItems(claudeJson.mcpServers, 'Claude', CLAUDE_JSON, 'user', { userWide: true }));
@@ -550,11 +585,14 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   const excluded = new Set(config.excluded);
   const vibe = vibeSetup(errors);
   const vibeRoots = vibe.skillPaths.filter(p => existsSync(p) && !roots.some(r => isInside(p, r)) && !config.ignored.includes(p));
-  const found = discover([...roots, ...vibeRoots], config.excluded, errors, config.ignored);
+  const codex = codexDocs(errors);
+  const fallbackNames = new Set(codex.fallbacks.filter(n => !RULE_NAMES.has(n)));
+  const found = discover([...roots, ...vibeRoots], config.excluded, errors, config.ignored, fallbackNames);
   for (const name of HOME_RULE_FILES) if (existsSync(join(HOME, name))) found.rules.add(join(HOME, name));
   if (MANAGED_CLAUDE_MD && existsSync(MANAGED_CLAUDE_MD)) found.rules.add(MANAGED_CLAUDE_MD);
   const files: FileRecord[] = [];
-  for (const p of [...found.rules].sort()) { try { files.push(record(p)); } catch (error) { errors.push(String(error)); } }
+  // A fallback name like TEAM_GUIDE.md is an instruction file only because Codex's config says so.
+  for (const p of [...found.rules].sort()) { try { files.push(record(p, fallbackNames.has(basename(p)) && !isRule(p) ? 'Codex / shared' : undefined)); } catch (error) { errors.push(String(error)); } }
   for (const f of files) {
     // Vibe reads AGENTS.md from the working folder up to the trust root, only in trusted folders.
     if (basename(f.path) === 'AGENTS.md' && f.scope === 'Folder' && vibe.installed && !vibe.untrusted.some(u => isInside(f.path, u))) f.readers = ['Vibe'];
@@ -591,7 +629,7 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   const inventory: Inventory = {
     scannedAt: now, baselineAt: previous.extrasTracked && previous.baselineAt ? previous.baselineAt : now, extrasTracked: true,
     roots, excluded: config.excluded, ignored: config.ignored, errors, files: items, extras, primaryFileCount: files.length, skillCount: skills.length,
-    plugins: installed, history, memories: memoryIndexes(), limits: LIMITS,
+    plugins: installed, history, memories: memoryIndexes(), limits: LIMITS, installedAgents: installedAgents() as Agent[], codexDocs: codex,
   };
   return { inventory, changes };
 }
