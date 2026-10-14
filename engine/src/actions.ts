@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkS
 import { platform } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { z } from 'zod';
-import { askClaude } from './ai.ts';
+import { AI_BACKENDS, AI_BACKEND_LABELS, aiAvailability, askAi, type AiBackend } from './ai.ts';
 import { analyze, short } from './analyze.ts';
 import { AGENT_DIRS, CONFIG_PATH, DEFAULT_CODE_DIRS, expandPath, HOME, KNOWN_AGENTS, saveIgnored, saveUserSettings, type ResolvedConfig } from './config.ts';
 import { nowIso, posix, scan } from './scan.ts';
@@ -328,7 +328,7 @@ Rules for your answer:
 - Keep the author's wording, formatting and bullet style. Do not touch anything unrelated.
 - Each edit: file (the path exactly as in the === header), find (text copied exactly from that file, whole lines, appearing only once), replace (the new text, or an empty string to delete).
 - summary: one plain sentence saying what you changed. Never use em dashes.`;
-    const { value, costUsd } = await askClaude(prompt, FixSchema);
+    const { value, costUsd } = await askAi(prompt, FixSchema);
     const byShort = new Map(paths.map(p => [short(p), p]));
     const edits = value.edits.map(edit => {
       const path = byShort.get(edit.file) ?? (paths.includes(edit.file) ? edit.file : null);
@@ -428,6 +428,16 @@ Rules for your answer:
     this.store.logAction({ at: nowIso(), kind: 'settings', summary: `Scanning ${folders.map(short).join(', ')}${skipped.length ? `, skipping ${skipped.length} ${skipped.length === 1 ? 'folder' : 'folders'}` : ''}. Agents: ${chosen.join(', ')}.` });
     rescan(this.store, this.config);
     return { message: 'Settings saved. Scanned again.' };
+  }
+
+  /** Which installed tool answers the AI review and fixes. Only an installed one can be picked. */
+  setAiBackend(backend: string): ActionReply {
+    if (!(AI_BACKENDS as readonly string[]).includes(backend)) throw new ActionRefused('Pick Claude Code, the Anthropic API, Codex or Mistral Vibe.');
+    const id = backend as AiBackend;
+    if (!aiAvailability().options.find(o => o.id === id)?.available) throw new ActionRefused(`${AI_BACKEND_LABELS[id]} is not installed on this Mac.`);
+    saveUserSettings({ aiBackend: id });
+    this.store.logAction({ at: nowIso(), kind: 'settings', summary: `AI review now uses ${AI_BACKEND_LABELS[id]}.` });
+    return { message: `AI review and fixes now use ${AI_BACKEND_LABELS[id]}.` };
   }
 
   /** The welcome screen: saves the first choices, marks onboarding done and runs the first scan. */

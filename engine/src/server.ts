@@ -22,6 +22,7 @@ const Body = z.object({
   backup: z.string().optional(), backups: z.array(z.string()).optional(), open: z.string().nullable().optional(),
   id: z.string().optional(), path: z.string().optional(), force: z.boolean().optional(), ignore: z.boolean().optional(),
   roots: z.array(z.string()).optional(), agents: z.array(z.string()).optional(), ignored: z.array(z.string()).optional(),
+  backend: z.string().optional(),
 });
 
 export interface ServerOptions { port: number; watch: boolean; onChange?: (summary: ChangeSummary) => void }
@@ -151,6 +152,7 @@ export class KlostiServer {
         return this.serialize(() => changed({ ...a.deleteAllData() }));
       case '/api/onboard': return this.serialize(() => changed({ ...a.onboard(body.roots ?? [], body.agents ?? [], body.ignored ?? []) }));
       case '/api/settings': return this.serialize(() => changed({ ...a.saveSettings(body.roots ?? [], body.agents ?? [], body.ignored) }));
+      case '/api/ai-backend': return this.serialize(() => changed({ ...a.setAiBackend(body.backend ?? '') }));
       case '/api/ignore-folder': return this.serialize(() => changed({ ...a.ignoreFolder(body.path ?? '', body.ignore ?? true) }));
       case '/api/remove-link': return this.serialize(() => changed({ ...a.removeLink(body.finding ?? '', body.path ?? '') }));
       case '/api/share-skill': return this.serialize(() => changed({ ...a.shareSkill(body.id ?? '', body.agents ?? []) }));
