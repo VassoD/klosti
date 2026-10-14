@@ -4,6 +4,7 @@ import { writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { aiAvailability } from './ai.ts';
 import { analyze } from './analyze.ts';
 import { resolveConfig } from './config.ts';
 import { payload, renderPage } from './page.ts';
@@ -19,7 +20,7 @@ const HELP = `klosti: see every rule, skill, hook and MCP server your coding age
 Usage
   klosti                 Scan, then open the app in your browser
   klosti scan            Scan and print a summary
-  klosti review          AI review of overlaps and contradictions (uses Claude)
+  klosti review          AI review of overlaps and contradictions (Claude Code, Codex, Mistral Vibe or the Anthropic API)
   klosti build -o FILE   Write a standalone HTML page
   klosti serve           Run the app without opening a browser
 
@@ -27,7 +28,7 @@ Options
   --root DIR      Scan this folder for projects (repeatable). Default: common code folders in your home
   --data DIR      Where the app keeps its data
   --port N        Port for the app (default ${DEFAULT_PORT})
-  --dry-run       review: list what would be reviewed, without calling Claude
+  --dry-run       review: list what would be reviewed, without calling the AI
   --force         review: review everything again
   --no-watch      serve: do not rescan when skill or plugin folders change
   --notify        scan: show a desktop notification when something was added, changed or removed
@@ -97,7 +98,9 @@ async function main(): Promise<void> {
       if (!store.inventory().files) doScan();
       const plan = planReview(analyze(store.inventory() as Inventory, store.judgements()), store, values.force ?? false, config.agents);
       if (values['dry-run'] || !plan.jobs.length) { console.log(plan.jobs.length ? `Would make ${plan.jobs.length} calls, about ${Math.round(plan.inputChars / CHARS_PER_TOKEN).toLocaleString('en-US')} input tokens:\n  ${plan.pending.join('\n  ')}` : 'Everything is already reviewed.'); return; }
-      console.log(`Reviewing ${plan.jobs.length} places with Claude...`);
+      const ai = aiAvailability();
+      if (!ai.via) { console.log(ai.detail); return; }
+      console.log(`Reviewing ${plan.jobs.length} places with ${ai.label}...`);
       const result = await runReview(plan, store, (done, total) => process.stdout.write(`\r  ${done}/${total}`));
       console.log(`\nReviewed ${result.reviewed}.${result.costUsd ? ` About $${result.costUsd.toFixed(2)} at list price.` : ''}`);
       result.failed.forEach(f => console.log(`  failed: ${f}`));
