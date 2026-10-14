@@ -408,7 +408,7 @@ const AGENTS=['Claude','Codex','Cursor','Gemini','Vibe'];
 const NEW_WINDOW_DAYS=14,DAY_MS=864e5,ROW_LIMIT=40;
 const KIND={rule:{one:'rule file',many:'rule files',title:'Rules'},skill:{one:'skill',many:'skills',title:'Skills'},command:{one:'command',many:'commands',title:'Commands'},subagent:{one:'subagent',many:'subagents',title:'Subagents'},hook:{one:'hook',many:'hooks',title:'Hooks'},mcp:{one:'MCP server',many:'MCP servers',title:'MCP servers'},'output-style':{one:'output style',many:'output styles',title:'Output styles'}};
 const KIND_ORDER=['skill','rule','command','subagent','hook','mcp'];
-const state={view:'overview',sev:'all',cat:'all',addedRoots:[],expandedRoots:new Set(),lensAgent:'Claude',lensProject:'',kind:'skill',invAgent:'all',invScope:'all',query:'',open:new Set(),expanded:new Set()};
+const state={view:'overview',sev:'all',cat:'all',addedRoots:[],expandedRoots:new Set(),lensAgent:AGENTS.find(a=>FOUND[a])||'Claude',lensProject:'',kind:'skill',invAgent:'all',invScope:'all',query:'',open:new Set(),expanded:new Set()};
 const baseline=new Date(D.baselineAt),scanned=new Date(D.scannedAt);
 const isNew=t=>!!t.firstSeen&&new Date(t.firstSeen)>baseline&&scanned-new Date(t.firstSeen)<NEW_WINDOW_DAYS*DAY_MS;
 const DISMISS_KEY='rulebook-dismissed';
@@ -520,8 +520,8 @@ function overview(){
   if(state.sev==='dismissed'&&!dismissed.size)state.sev='all';
   const canReview=!!API&&(!D.ai||!!D.ai.via);
   const reviewText=D.review.done?`${D.review.total-D.review.done} of ${D.review.total} places changed since the last AI review, or were never reviewed.`:'Overlaps below come from matching words only.';
-  const reviewAction=canReview?`<button class="btn-ai" data-run-review="1">Review now</button>`:D.ai&&!D.ai.via?`<span>${esc(D.ai.detail)}</span>`:`<span>Run <code>npx klosti review</code> to have Claude check them.</span>`;
-  const review=D.review.done<D.review.total?`<div class="review-note"><span class="sev medium"></span><div style="flex:1">${reviewText} Claude checks for duplicates and contradictions, and only reviews what changed.</div>${reviewAction}</div>`:'';
+  const reviewAction=canReview?`<button class="btn-ai" data-run-review="1">Review now</button>`:D.ai&&!D.ai.via?`<span>${esc(D.ai.detail)}</span>`:`<span>Run <code>npx klosti review</code> to have the AI check them.</span>`;
+  const review=D.review.done<D.review.total?`<div class="review-note"><span class="sev medium"></span><div style="flex:1">${reviewText} ${D.ai&&D.ai.label?`The AI review (${esc(D.ai.label)})`:'The AI review'} checks for duplicates and contradictions, and only reviews what changed.</div>${reviewAction}</div>`:'';
   return`<h1 class="lede">${esc(lede)}</h1>
   <p class="lede-sub">Your agents can reach ${plural(count('skill'),'skill')}, ${plural(count('rule'),'rule')}, ${plural(count('mcp'),'mcp')} and ${plural(count('hook'),'hook')} on this Mac.${high&&medium?` Another ${medium} overlaps are worth checking.`:''} Each item below says what happens today and what you can do.</p>
   <div class="agent-lines">${lines}</div>
@@ -537,10 +537,10 @@ function findingCard(f,forceOpen){
   const quoteAction=(q,i)=>!editable?'':q.removed?(q.backup?`<button class="btn-quiet" data-restore-line="${esc(q.backup)}" data-open="${f.id}">Restore</button>`:''):`<button class="btn-danger" data-del-line="${f.id}" data-quote="${i}">Delete this line</button>`;
   const quotes=(f.quotes||[]).map((q,i)=>`<div class="quote${q.removed?' removed':''}" id="q-${f.id}-${i}"><div class="quote-row"><div><span class="text">${esc(q.text)}</span>${q.removed?'<span class="done">Deleted</span>':''}<span class="path">${esc(q.file)}</span></div>${quoteAction(q,i)}</div></div>`).join('');
   const editHint=f.kind==='contradiction'&&!API&&(f.quotes||[]).length?'<p class="muted" style="font-size:13px;margin:0 0 12px">To delete one side of this from here, open it in the app with <code>npx klosti</code>.</p>':'';
-  const source=f.reviewed?'Reviewed by Claude':f.verdict==='candidate'?'Word match, not reviewed':f.estimate?'Estimate':'';
+  const source=f.reviewed?'AI reviewed':f.verdict==='candidate'?'Word match, not reviewed':f.estimate?'Estimate':'';
   const gone=dismissed.has(f.id);
   return`<article class="finding${open?' is-open':''}${gone?' is-dismissed':''}" data-card="${f.id}"><button data-finding="${f.id}" aria-expanded="${open}"><div><div class="meta"><span class="sev ${f.severity}">${SEV_LABEL[f.severity]}</span><span>${esc(KIND_LABEL[f.kind]||f.kind)}${f.partlyFixed?', partly fixed':''}</span><span>${esc(f.where)}</span>${agentList(f.agents)}${source?`<span>${source}</span>`:''}</div><h3>${esc(f.title)}</h3><p class="sum">${esc(f.summary)}</p></div><span class="caret" aria-hidden="true">›</span></button>
-  ${open?`<div class="finding-body"><div class="explain"><div><b>What happens</b>${esc(f.happens)}</div><div><b>What you can do</b>${esc(f.todo)}</div></div>${quotes?`<div class="quotes">${quotes}</div>${editHint}`:''}${f.items.length?`<div class="items-row">${f.items.map(thingChip).join('')}</div>`:''}<div class="fix-slot" id="fix-${f.id}"></div><div class="finding-actions">${API&&!gone&&(f.extraLinks||[]).length?f.extraLinks.map(p=>`<button class="btn-primary" data-remove-link="${f.id}" data-path="${esc(p)}" title="Deletes only the link. The skill folder stays.">${f.extraLinks.length>1?`Remove ${esc(short(p))}`:'Remove the extra link'}</button>`).join(''):''}${editable&&!gone&&(!D.ai||D.ai.via)?`<button class="btn-ai" data-fix="${f.id}" title="Claude proposes an edit. You review it before anything changes.">Fix with AI</button>`:''}${editable&&!gone?`<button class="btn-primary" data-resolve="${f.id}">Mark as resolved</button>`:''}${gone?`<button class="btn-quiet" data-restore="${f.id}">Bring back</button>`:`<button class="btn-quiet" data-dismiss="${f.id}" title="Hide it without changing any file">Ignore this</button>`}</div></div>`:''}</article>`;
+  ${open?`<div class="finding-body"><div class="explain"><div><b>What happens</b>${esc(f.happens)}</div><div><b>What you can do</b>${esc(f.todo)}</div></div>${quotes?`<div class="quotes">${quotes}</div>${editHint}`:''}${f.items.length?`<div class="items-row">${f.items.map(thingChip).join('')}</div>`:''}<div class="fix-slot" id="fix-${f.id}"></div><div class="finding-actions">${API&&!gone&&(f.extraLinks||[]).length?f.extraLinks.map(p=>`<button class="btn-primary" data-remove-link="${f.id}" data-path="${esc(p)}" title="Deletes only the link. The skill folder stays.">${f.extraLinks.length>1?`Remove ${esc(short(p))}`:'Remove the extra link'}</button>`).join(''):''}${editable&&!gone&&(!D.ai||D.ai.via)?`<button class="btn-ai" data-fix="${f.id}" title="The AI proposes an edit. You review it before anything changes.">Fix with AI</button>`:''}${editable&&!gone?`<button class="btn-primary" data-resolve="${f.id}">Mark as resolved</button>`:''}${gone?`<button class="btn-quiet" data-restore="${f.id}">Bring back</button>`:`<button class="btn-quiet" data-dismiss="${f.id}" title="Hide it without changing any file">Ignore this</button>`}</div></div>`:''}</article>`;
 }
 
 function visible(t,agent,pid){return t.agents.includes(agent)&&(t.global||(!!pid&&t.projects.some(p=>p.id===pid)));}
@@ -967,9 +967,16 @@ function settings(){
   <h2 class="section">Agents you work with</h2><p class="section-sub">Unchecked agents disappear from every view, and the AI review skips them, so you do not pay for them.</p><div class="setting-list">${agentRows}</div>
   <h2 class="section">Folders where you code</h2><p class="section-sub">Klosti looks for projects in these folders. Your agent settings folders (${esc(st.agentRoots.map(short).join(', ')||'~/.claude and others')}) are always scanned, because that is where global rules and skills live.</p><div class="setting-list">${folderRows}</div>${add}
   ${save}
+  ${aiSection()}
   ${ignoredSection()}
   <p class="muted" style="font-size:13px;margin-top:28px">Saved in <code>${esc(short(st.configFile))}</code>, shared with <code>npx klosti</code>.</p>
   ${API?`<h2 class="section">Start over</h2><div class="remove-box"><span>Deletes everything Klosti keeps: the scan, AI review results, history, backups of files you edited, and these settings. It all goes to the Trash, so you can put it back. Your rule and skill files are not touched. Then you see the welcome screen again.</span><button class="btn-danger" data-delete-data="1">Delete all data</button></div>`:''}`;
+}
+/** The tool that runs the AI review and fixes. It is separate from the agents above: any installed one can review every agent. */
+function aiSection(){
+  const ai=D.ai;if(!ai||!ai.options)return'';
+  const rows=ai.options.map(o=>{const current=o.id===ai.via;const action=current?'<span class="muted">In use</span>':o.available?(API?`<button class="btn-quiet" data-ai-backend="${esc(o.id)}">Use this</button>`:'<span class="muted">Installed</span>'):'<span class="muted">Not installed</span>';return`<div class="setting-row"><span><b>${esc(o.label)}</b></span>${action}</div>`;}).join('');
+  return`<h2 class="section">AI review and fixes</h2><p class="section-sub">Which installed tool answers when you click Review now or Fix with AI. It reviews every agent's setup, not only its own. It runs in an empty temporary folder, and Klosti applies any edit itself, with a backup.</p><div class="setting-list">${rows}</div>`;
 }
 function changes(){
   return`<h1 class="lede">Changes</h1><p class="lede-sub">One timeline: what you fixed from this page, plus anything the scans noticed on their own, like a new skill or a rule file edited by hand. The watcher rescans when your skill or plugin folders change, and every 3 hours.</p>
@@ -1055,6 +1062,7 @@ document.addEventListener('click',e=>{
   }
   else if(d.toggleRoot){const f=d.toggleRoot;rememberChecks();state.expandedRoots.has(f)?state.expandedRoots.delete(f):state.expandedRoots.add(f);render();restoreChecks();}
   else if(d.addRoot){b.disabled=true;chooseFolder(API.token).then(path=>{b.disabled=false;if(!path)return;rememberChecks();if(!state.addedRoots.includes(path)&&!(D.settings?.candidates||[]).includes(path))state.addedRoots.push(path);render();restoreChecks();}).catch(err=>{b.disabled=false;showToast(err.message,null);});}
+  else if(d.aiBackend){b.disabled=true;callApi('/api/ai-backend',{backend:d.aiBackend});}
   else if(d.saveSettings){
     const picked=name=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
     const agents=picked('agent'),roots=picked('root');
@@ -1134,7 +1142,7 @@ async function proposeFix(findingId,button){
   const slot=$('fix-'+findingId);if(!slot)return;
   slot.innerHTML='';
   const label=button.textContent;
-  button.disabled=true;button.textContent='Claude is thinking…';
+  button.disabled=true;button.textContent=`${D.ai&&D.ai.label?D.ai.label:'The AI'} is thinking…`;
   const proposal=await callApi('/api/propose-fix',{finding:findingId});
   button.disabled=false;button.textContent=label;
   if(!proposal)return;
@@ -1180,7 +1188,7 @@ if(API){
   $('reload').addEventListener('click',()=>location.reload());
   setInterval(async()=>{try{const r=await fetch('/api/version');const v=await r.json();if(D.version&&v.version!==D.version&&!$('drawer').open)$('updated').hidden=false;}catch(e){}},VERSION_POLL_MS);
 }
-if(API)$('mode-line').textContent='Changes are backed up and listed under Changes. AI fixes use your Claude Code.';
+if(API)$('mode-line').textContent=`Changes are backed up and listed under Changes. ${D.ai&&D.ai.label?`AI fixes use ${D.ai.label}.`:'AI fixes need Claude Code, Codex or Mistral Vibe.'}`;
 navCounts();render();
 try{
   const raw=sessionStorage.getItem('rulebook-flash');
