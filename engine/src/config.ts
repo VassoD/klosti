@@ -127,8 +127,39 @@ export const rootCandidates = (config: ResolvedConfig): string[] => [...new Set(
 
 export const CONFIG_PATH = CONFIG_FILE;
 
-/** Where each agent keeps its user-wide settings. A folder that exists means the agent is probably installed. */
+/** Where each agent keeps its user-wide settings. The folder can outlive an uninstall, so it does not prove the agent is installed. */
 export const AGENT_HOMES: Record<string, string> = { Claude: '.claude', Codex: '.codex', Cursor: '.cursor', Gemini: '.gemini', Vibe: '.vibe' };
+
+/** The command or app that shows each agent is actually installed. */
+const AGENT_PRESENCE: Record<string, { commands: string[]; apps: string[] }> = {
+  Claude: { commands: ['claude'], apps: ['Claude.app'] },
+  Codex: { commands: ['codex'], apps: ['Codex.app'] },
+  Cursor: { commands: ['cursor', 'cursor-agent'], apps: ['Cursor.app'] },
+  Gemini: { commands: ['gemini'], apps: [] },
+  Vibe: { commands: ['vibe'], apps: [] },
+};
+
+/**
+ * Folders to look for agent commands in. The menu bar app starts with a minimal PATH, so the usual install
+ * folders are added. KLOSTI_SEARCH_PATH replaces the whole list, which keeps tests independent of this Mac.
+ */
+function searchFolders(): { bins: string[]; apps: string[] } {
+  const override = process.env.KLOSTI_SEARCH_PATH;
+  if (override !== undefined) { const dirs = override.split(':').filter(Boolean); return { bins: dirs, apps: dirs }; }
+  const nvm = join(HOME, '.nvm', 'versions', 'node');
+  const nvmBins = existsSync(nvm) ? readdirSync(nvm).map(v => join(nvm, v, 'bin')) : [];
+  const bins = [...(process.env.PATH ?? '').split(':'), ...['.local/bin', '.bun/bin', '.npm-global/bin', '.volta/bin', '.cargo/bin'].map(d => join(HOME, d)), ...nvmBins, '/opt/homebrew/bin', '/usr/local/bin'];
+  return { bins: [...new Set(bins.filter(Boolean))], apps: ['/Applications', join(HOME, 'Applications')] };
+}
+
+/** Agents whose command or app is on this computer. */
+export function installedAgents(): string[] {
+  const { bins, apps } = searchFolders();
+  return KNOWN_AGENTS.filter(name => {
+    const presence = AGENT_PRESENCE[name];
+    return !!presence && (presence.commands.some(c => bins.some(d => existsSync(join(d, c)))) || presence.apps.some(a => apps.some(d => existsSync(join(d, a)))));
+  });
+}
 /** How far below a code folder the welcome screen looks for projects, for layouts like code/client/repo. */
 const PROJECT_SEARCH_DEPTH = 4;
 /** Files or folders that mark a project as having agent instructions. */
@@ -159,7 +190,7 @@ export function onboardingChoices(config: ResolvedConfig): OnboardingChoices {
     return found.sort((a, b) => a.localeCompare(b));
   };
   return {
-    agents: KNOWN_AGENTS.map(name => ({ name, found: existsSync(join(HOME, AGENT_HOMES[name] ?? '')) })),
+    agents: (() => { const installed = installedAgents(); return KNOWN_AGENTS.map(name => ({ name, found: installed.includes(name) })); })(),
     folders: rootCandidates(config).map(path => ({ path, projects: projectsIn(path) })),
     agentRoots: config.agentRoots,
   };

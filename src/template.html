@@ -499,7 +499,7 @@ function render(){
 }
 
 const SEV_LABEL={high:'Act on this',medium:'Worth checking',low:'For your information'};
-const KIND_LABEL={'same-name':'Same name',overlap:'Overlap',contradiction:'Contradiction',drift:'Different instructions',budget:'Skill list size','shadows-builtin':'Replaces a built-in',hidden:'Hidden instructions','listed-twice':'Listed twice'};
+const KIND_LABEL={'same-name':'Same name',overlap:'Overlap',contradiction:'Contradiction',drift:'Different instructions',budget:'Skill list size','shadows-builtin':'Replaces a built-in',hidden:'Hidden instructions','listed-twice':'Listed twice','too-long':'Instructions cut off'};
 function overview(){
   const count=k=>D.things.filter(t=>t.kind===k).length;
   const high=live().filter(f=>f.severity==='high').length,medium=live().filter(f=>f.severity==='medium').length;
@@ -511,7 +511,9 @@ function overview(){
   const lines=present.map(a=>{
     const mine=D.things.filter(t=>t.agents.includes(a));
     const parts=KIND_ORDER.map(k=>[k,mine.filter(t=>t.kind===k)]).filter(([,v])=>v.length).map(([k,v])=>{const g=v.filter(t=>t.global).length;return plural(v.length,k)+(k==='rule'||k==='skill'?` (${g} global)`:'');});
-    return`<div class="agent-line">${agentDot(a)}<p>${parts.join(', ')}</p><button data-lens-agent="${a}">See where</button></div>`;
+    // Files can outlive an uninstall, so say when nothing will load them.
+    const absent=D.installedAgents&&!D.installedAgents.includes(a)?` <span class="muted">· not installed, so nothing loads these</span>`:'';
+    return`<div class="agent-line">${agentDot(a)}<p>${parts.join(', ')}${absent}</p><button data-lens-agent="${a}">See where</button></div>`;
   }).join('');
   const sevs=[['all','All'],['high','Act on these'],['medium','Worth checking'],['low','For your information']];
   const shown=live().filter(f=>state.cat==='all'||categoryOf(f)===state.cat);

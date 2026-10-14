@@ -34,7 +34,7 @@ export function payload(store: Store, analysis: Analysis, config: ResolvedConfig
     usage: usageSafely(store),
     settings: { agents: config.agents, roots: config.codeRoots, candidates: rootCandidates(config), agentRoots: config.agentRoots, configFile: CONFIG_PATH },
     history: inventory.history ?? [], actions: store.actions(), plugins: inventory.plugins ?? [], memories: inventory.memories ?? [],
-    scannedAt: inventory.scannedAt, baselineAt: inventory.baselineAt ?? inventory.scannedAt, roots: inventory.roots ?? [], excluded: inventory.excluded ?? [], ignored: inventory.ignored ?? [], limits: inventory.limits ?? [], errors: inventory.errors ?? [],
+    scannedAt: inventory.scannedAt, baselineAt: inventory.baselineAt ?? inventory.scannedAt, roots: inventory.roots ?? [], excluded: inventory.excluded ?? [], ignored: inventory.ignored ?? [], limits: inventory.limits ?? [], errors: inventory.errors ?? [], installedAgents: inventory.installedAgents ?? null,
   };
 }
 
