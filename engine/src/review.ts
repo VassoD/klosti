@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { normalize } from './actions.ts';
-import { AI_MODEL, askClaude } from './ai.ts';
+import { askAi } from './ai.ts';
 import { analyze, short } from './analyze.ts';
 import { nowIso } from './scan.ts';
 import type { Store } from './store.ts';
@@ -146,7 +146,7 @@ interface Job {
 
 export interface ReviewPlan { pending: string[]; jobs: Job[]; inputChars: number }
 
-const entry = <T extends object>(value: T): T & { at: string; model: string } => ({ ...value, at: nowIso(), model: AI_MODEL });
+const entry = <T extends object>(value: T, model: string): T & { at: string; model: string } => ({ ...value, at: nowIso(), model });
 
 /** What still needs an AI review: places never reviewed, or carried over after a change made from the app. */
 export function planReview(analysis: Analysis, store: Store, force = false, agents: string[] = []): ReviewPlan {
@@ -167,16 +167,16 @@ export function planReview(analysis: Analysis, store: Store, force = false, agen
     if (!stale(cache.skills[ctx.key], `skills:${ctx.key}`)) continue;
     const prompt = skillPrompt(ctx, byId, projects);
     jobs.push({ label: label('skills', ctx.agent, ctx.project), phase: 2, inputChars: prompt.length, run: async () => {
-      const { value, costUsd } = await askClaude(prompt, SkillGroupsSchema);
-      return { costUsd, save: c => { c.skills[ctx.key] = entry(value); } };
+      const { value, costUsd, model } = await askAi(prompt, SkillGroupsSchema);
+      return { costUsd, save: c => { c.skills[ctx.key] = entry(value, model); } };
     } });
   }
   for (const stack of analysis.stacks.filter(s => wanted(s.agent))) {
     if (!stale(cache.rules[stack.key], `rules:${stack.key}`)) continue;
     const prompt = rulePrompt(stack, byId, projects);
     jobs.push({ label: label('rules', stack.agent, stack.project), phase: 2, inputChars: prompt.length, run: async () => {
-      const { value, costUsd } = await askClaude(prompt, RuleConflictsSchema);
-      return { costUsd, save: c => { c.rules[stack.key] = entry(value); } };
+      const { value, costUsd, model } = await askAi(prompt, RuleConflictsSchema);
+      return { costUsd, save: c => { c.rules[stack.key] = entry(value, model); } };
     } });
   }
 
@@ -193,9 +193,9 @@ export function planReview(analysis: Analysis, store: Store, force = false, agen
   batches.forEach((batch, n) => {
     const prompt = digestPrompt(batch);
     jobs.push({ label: `skill instructions ${n + 1}/${batches.length}`, phase: 1, inputChars: prompt.length, run: async () => {
-      const { value, costUsd } = await askClaude(prompt, DigestSchema);
+      const { value, costUsd, model } = await askAi(prompt, DigestSchema);
       const byRef = new Map(value.skills.map(s => [s.ref, s.instructions]));
-      return { costUsd, save: c => batch.forEach((t, i) => { c.digests[t.sha] = entry({ instructions: verbatim(t.body, byRef.get(`s${i + 1}`) ?? []) }); }) };
+      return { costUsd, save: c => batch.forEach((t, i) => { c.digests[t.sha] = entry({ instructions: verbatim(t.body, byRef.get(`s${i + 1}`) ?? []) }, model); }) };
     } });
   });
   for (const stack of istacks) {
@@ -207,9 +207,9 @@ export function planReview(analysis: Analysis, store: Store, force = false, agen
       const digests = current.judgements().digests;
       if (stack.skills.some(id => !digests[byId.get(id)!.sha])) throw new Error('Some skills could not be read, so this place was not checked. Run the review again.');
       const prompt = instructionPrompt(stack, byId, projects, digests);
-      if (!prompt) return { costUsd: 0, save: c => { c.instructions[stack.key] = entry({ conflicts: [] }); } };
-      const { value, costUsd } = await askClaude(prompt, RuleConflictsSchema);
-      return { costUsd, save: c => { c.instructions[stack.key] = entry(value); } };
+      if (!prompt) return { costUsd: 0, save: c => { c.instructions[stack.key] = entry({ conflicts: [] }, 'none'); } };
+      const { value, costUsd, model } = await askAi(prompt, RuleConflictsSchema);
+      return { costUsd, save: c => { c.instructions[stack.key] = entry(value, model); } };
     } });
   }
   jobs.sort((a, b) => a.phase - b.phase);

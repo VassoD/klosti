@@ -40,6 +40,8 @@ export interface UserConfig {
   agents?: string[];
   /** Set once the user has chosen folders and agents on the welcome screen. */
   onboarded?: boolean;
+  /** Which installed tool runs the AI review and fixes: claude-code, api, codex or vibe. Unset picks the first one found. */
+  aiBackend?: string;
 }
 
 export class ConfigError extends Error {
@@ -53,7 +55,7 @@ function readUserConfig(): UserConfig {
     if (typeof parsed !== 'object' || parsed === null) throw new ConfigError('config must be a JSON object');
     const config = parsed as Record<string, unknown>;
     const strings = (value: unknown): string[] | undefined => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined);
-    return { roots: strings(config.roots), exclude: strings(config.exclude), ignore: strings(config.ignore), agents: strings(config.agents), onboarded: typeof config.onboarded === 'boolean' ? config.onboarded : undefined, replaceDefaultRoots: config.replaceDefaultRoots === true };
+    return { roots: strings(config.roots), exclude: strings(config.exclude), ignore: strings(config.ignore), agents: strings(config.agents), onboarded: typeof config.onboarded === 'boolean' ? config.onboarded : undefined, replaceDefaultRoots: config.replaceDefaultRoots === true, aiBackend: typeof config.aiBackend === 'string' ? config.aiBackend : undefined };
   } catch (error) {
     throw new ConfigError(`Could not read ${CONFIG_FILE}: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -103,7 +105,7 @@ export const MANAGED_CLAUDE_MD = platform() === 'darwin' ? '/Library/Application
 const tildePath = (p: string): string => (p.startsWith(`${HOME}/`) ? `~/${p.slice(HOME.length + 1)}` : p);
 
 /** Merges these settings into the config file, keeping every other setting as it was. */
-export function saveUserSettings(patch: Partial<Record<'roots' | 'ignore' | 'agents', string[]>> & { replaceDefaultRoots?: boolean; onboarded?: boolean }): void {
+export function saveUserSettings(patch: Partial<Record<'roots' | 'ignore' | 'agents', string[]>> & { replaceDefaultRoots?: boolean; onboarded?: boolean; aiBackend?: string }): void {
   const current: Record<string, unknown> = existsSync(CONFIG_FILE) ? JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as Record<string, unknown> : {};
   const next: Record<string, unknown> = { ...current, ...patch };
   for (const key of ['roots', 'ignore'] as const) if (patch[key]) next[key] = [...new Set(patch[key])].sort().map(tildePath);
@@ -114,6 +116,11 @@ export function saveUserSettings(patch: Partial<Record<'roots' | 'ignore' | 'age
 }
 
 export const saveIgnored = (paths: string[]): void => saveUserSettings({ ignore: paths });
+
+/** Read on every AI call, so a change in Settings applies without a restart. A broken config file means no preference. */
+export function readAiBackend(): string | undefined {
+  try { return readUserConfig().aiBackend; } catch { return undefined; }
+}
 
 /** Code folders the settings can offer: the common ones that exist, plus any the user added. */
 export const rootCandidates = (config: ResolvedConfig): string[] => [...new Set([...DEFAULT_CODE_DIRS.map(d => join(HOME, d)).filter(p => existsSync(p)), ...config.codeRoots])];
