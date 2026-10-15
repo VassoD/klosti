@@ -3,7 +3,9 @@ import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSyn
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
 import { AGENT_DIRS, expandPath, HOME, installedAgents, MANAGED_CLAUDE_MD, type ResolvedConfig } from './config.ts';
-import type { Agent, ChangeSummary, Extra, Extras, FileRecord, HistoryEntry, HookExtra, InstalledPlugin, Inventory, McpExtra, McpScope, MarkdownExtra, MemoryIndex, RuleFamily, Scope, SkillSource } from './types.ts';
+import { lineDiff, previewLines, type FileDiff } from './diff.ts';
+import { SNAPSHOT_MAX_BYTES, type Snapshots } from './snapshots.ts';
+import type { Agent, ChangeSummary, Extra, Extras, FileRecord, HistoryEntry, SupportFile, HookExtra, InstalledPlugin, Inventory, McpExtra, McpScope, MarkdownExtra, MemoryIndex, RuleFamily, Scope, SkillSource } from './types.ts';
 
 const RULE_NAMES = new Set(['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md', 'GEMINI.md', '.cursorrules', '.windsurfrules', 'copilot-instructions.md']);
 const RULE_DIRS = ['/.claude/rules/', '/.cursor/rules/', '/.windsurf/rules/'];
@@ -11,6 +13,12 @@ const HOME_RULE_FILES = ['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE
 const SKILL_NAME = 'SKILL.md';
 const SKILLS_LOCK = 'skills-lock.json';
 const HISTORY_LIMIT = 200;
+/** Only the latest entries keep their line diffs; older ones keep the counts. The history is embedded in the page. */
+const DIFF_HISTORY_LIMIT = 30;
+const MAX_DIFF_FILES = 20;
+const MAX_ENTRY_DIFF_LINES = 2000;
+/** A skill folder with more files than this is fingerprinted only up to the limit. */
+const MAX_SUPPORT_FILES = 300;
 const COMMAND_PREVIEW_CHARS = 4000;
 const HOOK_COMMAND_CHARS = 280;
 const IMPORT_ROUNDS = 4;
@@ -254,6 +262,30 @@ function supportFileCount(dir: string, excluded: Set<string>): number {
   return count - 1;
 }
 
+/** Fingerprints every file in a skill folder besides SKILL.md, and keeps a copy of the small text ones. */
+export function supportFiles(dir: string, excluded: Set<string>, snapshots?: Snapshots): SupportFile[] {
+  const out: SupportFile[] = [];
+  const walk = (d: string): void => {
+    let entries;
+    try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (out.length >= MAX_SUPPORT_FILES) return;
+      const p = join(d, e.name);
+      if (e.isDirectory()) { if (!excluded.has(e.name)) walk(p); continue; }
+      if (!e.isFile() || (d === dir && e.name === SKILL_NAME)) continue;
+      let raw: Buffer;
+      try { raw = readFileSync(p); } catch { continue; }
+      // A NUL byte is the usual sign of a binary file.
+      const text = raw.length <= SNAPSHOT_MAX_BYTES && !raw.includes(0);
+      const file: SupportFile = { path: posix(relative(dir, p)), sha256: sha256(raw), bytes: raw.length, text };
+      if (text && snapshots) snapshots.put(raw.toString('utf8'), file.sha256);
+      out.push(file);
+    }
+  };
+  walk(dir);
+  return out;
+}
+
 interface PluginRoot {
   id: string;
   agent: Agent;
@@ -283,7 +315,7 @@ function pluginHomepage(root: string, id: string, marketplaces: Record<string, u
   return source.source === 'github' && repo && /^[\w.-]+\/[\w.-]+$/.test(repo) ? `https://github.com/${repo}` : webUrl(source.url);
 }
 
-function skillRecord(path: string, excluded: Set<string>, plugin: PluginRoot | null, origins: Map<string, string>, vibe: VibeSetup): FileRecord {
+function skillRecord(path: string, excluded: Set<string>, plugin: PluginRoot | null, origins: Map<string, string>, vibe: VibeSetup, snapshots?: Snapshots): FileRecord {
   const item = record(path, 'Skill');
   const meta = frontmatter(item.text);
   const dir = dirname(path);
@@ -302,6 +334,7 @@ function skillRecord(path: string, excluded: Set<string>, plugin: PluginRoot | n
     origin: plugin ? plugin.id : origins.get(`${item.folder}\u0000${basename(dir)}`) ?? null,
     plugin: plugin ? { id: plugin.id, version: plugin.version, installedAt: plugin.installedAt } : null,
     supportFiles: supportFileCount(dir, excluded),
+    files: supportFiles(dir, excluded, snapshots),
     manualOnly: meta['disable-model-invocation'] === 'true',
     hiddenFromMenu: meta['user-invocable'] === 'false',
   };
@@ -515,31 +548,133 @@ const trackedAgents = (x: Tracked): string[] => ('family' in x && x.skill?.agent
 /** A skill reached through links is one file, so every path to it shares this key. */
 const realKey = (x: Tracked): string => ('family' in x && x.family === 'Skill' ? x.realPath ?? x.path : x.key);
 
+/** True when two fingerprints of a skill folder differ. Missing lists mean an older inventory, so no change. */
+function supportChanged(before: SupportFile[] | undefined, after: SupportFile[] | undefined): boolean {
+  if (!before || !after) return false;
+  if (before.length !== after.length) return true;
+  const shas = new Map(before.map(f => [f.path, f.sha256]));
+  return after.some(f => shas.get(f.path) !== f.sha256);
+}
+
+/**
+ * A skill changed when SKILL.md or any other file in its folder did. An inventory from before folder
+ * fingerprints has no file list; a plugin update that moved the skill to a new version folder can still be
+ * checked against the old folder, which plugin caches usually leave in place.
+ */
+function isChanged(before: Tracked, after: Tracked, excluded: Set<string>): boolean {
+  if (before.sha256 !== after.sha256) return true;
+  if (!('family' in before) || !('family' in after) || !after.skill) return false;
+  if (before.skill?.files) return supportChanged(before.skill.files, after.skill.files);
+  const oldDir = dirname(before.path);
+  return oldDir !== dirname(after.path) && existsSync(oldDir) && supportChanged(supportFiles(oldDir, excluded), after.skill.files);
+}
+
+/** The text of an earlier supporting file: its kept copy, or the old file itself when it is still on disk unchanged. */
+function earlierText(dir: string, file: SupportFile, snapshots?: Snapshots): string | null {
+  const kept = snapshots?.get(file.sha256);
+  if (kept !== null && kept !== undefined) return kept;
+  const path = join(dir, file.path);
+  try {
+    const raw = readFileSync(path);
+    return sha256(raw) === file.sha256 ? raw.toString('utf8') : null;
+  } catch { return null; }
+}
+
+/**
+ * Line diffs for one changed skill or rule. SKILL.md and rule text come from the inventories; supporting files
+ * from kept copies, or from the previous plugin version folder, which plugin caches usually leave in place.
+ */
+function changeDiffs(before: Tracked, after: Tracked, excluded: Set<string>, snapshots?: Snapshots): FileDiff[] {
+  if (!('family' in before) || !('family' in after)) return [];
+  const diffs: FileDiff[] = [];
+  const name = after.family === 'Skill' ? SKILL_NAME : basename(after.path);
+  if (before.sha256 !== after.sha256) diffs.push(lineDiff(before.text, after.text, name));
+  if (after.family !== 'Skill') return diffs;
+  const oldDir = dirname(before.path), newDir = dirname(after.path);
+  // An inventory from before folder fingerprints: a moved plugin folder can still be compared on disk.
+  const oldFiles = before.skill?.files ?? (oldDir !== newDir && existsSync(oldDir) ? supportFiles(oldDir, excluded) : undefined);
+  const newFiles = after.skill?.files;
+  if (!oldFiles || !newFiles) return diffs;
+  const oldByPath = new Map(oldFiles.map(f => [f.path, f]));
+  const newByPath = new Map(newFiles.map(f => [f.path, f]));
+  const paths = [...new Set([...oldByPath.keys(), ...newByPath.keys()])].sort();
+  for (const rel of paths) {
+    const was = oldByPath.get(rel), now = newByPath.get(rel);
+    if (was && now && was.sha256 === now.sha256) continue;
+    const status: FileDiff['status'] = !was ? 'added' : !now ? 'removed' : 'changed';
+    if ((was && !was.text) || (now && !now.text)) {
+      diffs.push({ file: rel, status, added: 0, removed: 0, note: 'Binary or larger than 64 KB, so only the fact that it changed is kept.' });
+      continue;
+    }
+    const oldText = was ? earlierText(oldDir, was, snapshots) : '';
+    const newText = now ? earlierText(newDir, now, snapshots) : '';
+    if (oldText === null || newText === null) {
+      diffs.push({ file: rel, status, added: 0, removed: 0, note: 'No earlier copy to compare with.' });
+      continue;
+    }
+    diffs.push(lineDiff(oldText, newText, rel));
+  }
+  return diffs;
+}
+
+/** Keeps one history entry within the line budget: later files lose their hunks first. */
+function capDiffs(diffs: FileDiff[]): FileDiff[] {
+  let budget = MAX_ENTRY_DIFF_LINES;
+  return diffs.slice(0, MAX_DIFF_FILES).map(d => {
+    const lines = (d.hunks ?? []).reduce((sum, h) => sum + h.lines.length, 0);
+    if (lines <= budget) { budget -= lines; return d; }
+    const { hunks: _dropped, ...rest } = d;
+    return { ...rest, truncated: true };
+  });
+}
+
+/** Older history entries keep their counts but drop hunks and previews, so the page stays light. */
+export function trimHistory(history: HistoryEntry[]): HistoryEntry[] {
+  const keepFrom = history.length - DIFF_HISTORY_LIMIT;
+  return history.map((entry, i) => {
+    if (i >= keepFrom) return entry;
+    const strip = (list: ChangeSummary[]): ChangeSummary[] => list.map(({ preview: _p, diffs, ...c }) => (diffs ? { ...c, diffs: diffs.map(({ hunks: _h, ...d }) => d) } : c));
+    return { ...entry, added: strip(entry.added), removed: strip(entry.removed), changed: strip(entry.changed) };
+  });
+}
+
 /** Carries first-seen dates across scans and returns what changed since the last one. */
-function trackChanges(previous: Partial<Inventory>, current: Tracked[], now: string): Omit<HistoryEntry, 'at'> {
+function trackChanges(previous: Partial<Inventory>, current: Tracked[], now: string, snapshots?: Snapshots, excluded = new Set<string>()): Omit<HistoryEntry, 'at'> {
   const old = new Map<string, Tracked>([...(previous.files ?? []), ...allExtras(previous.extras)].map(x => [x.key ?? x.path, x]));
+  const changedKeys = new Set<string>();
   for (const item of current) {
     const before = old.get(item.key);
     item.firstSeen = before?.firstSeen ?? now;
     item.changedAt = before?.changedAt ?? null;
-    if (before && before.sha256 !== item.sha256) item.changedAt = now;
+    if (before && isChanged(before, item, excluded)) { item.changedAt = now; changedKeys.add(item.key); }
   }
   if (!previous.extrasTracked) return { added: [], removed: [], changed: [] };
+  type Detail = Pick<ChangeSummary, 'linesAdded' | 'linesRemoved' | 'diffs' | 'preview'>;
+  const detail = (x: Tracked, mode: 'added' | 'removed' | 'changed'): Detail => {
+    if (!('family' in x)) return {};
+    if (mode !== 'changed') {
+      const count = x.lines;
+      return mode === 'added' ? { linesAdded: count, preview: previewLines(x.text) } : { linesRemoved: count, preview: previewLines(x.text) };
+    }
+    const diffs = capDiffs(changeDiffs(old.get(x.key)!, x, excluded, snapshots));
+    if (!diffs.length) return {};
+    return { linesAdded: diffs.reduce((s, d) => s + d.added, 0), linesRemoved: diffs.reduce((s, d) => s + d.removed, 0), diffs };
+  };
   // One line per real file: the original path first, then the links to it.
-  const summarize = (items: Tracked[]): ChangeSummary[] => {
+  const summarize = (items: Tracked[], mode: 'added' | 'removed' | 'changed'): ChangeSummary[] => {
     const groups = new Map<string, Tracked[]>();
     for (const x of items) groups.set(realKey(x), [...(groups.get(realKey(x)) ?? []), x]);
     return [...groups].map(([real, group]) => {
       const sorted = [...group].sort((a, b) => Number(b.path === real) - Number(a.path === real) || a.path.localeCompare(b.path));
       const first = sorted[0]!;
-      return { key: first.key, kind: trackedKind(first), name: trackedName(first), agent: trackedAgent(first), path: first.path, agents: [...new Set(sorted.flatMap(trackedAgents))].sort(), paths: sorted.map(x => x.path) };
+      return { key: first.key, kind: trackedKind(first), name: trackedName(first), agent: trackedAgent(first), path: first.path, agents: [...new Set(sorted.flatMap(trackedAgents))].sort(), paths: sorted.map(x => x.path), ...detail(first, mode) };
     });
   };
   const now_ = new Map(current.map(x => [x.key, x]));
   return {
-    added: summarize([...now_].filter(([k]) => !old.has(k)).map(([, x]) => x)),
-    removed: summarize([...old].filter(([k]) => !now_.has(k)).map(([, x]) => x)),
-    changed: summarize([...now_].filter(([k, x]) => old.has(k) && old.get(k)!.sha256 !== x.sha256).map(([, x]) => x)),
+    added: summarize([...now_].filter(([k]) => !old.has(k)).map(([, x]) => x), 'added'),
+    removed: summarize([...old].filter(([k]) => !now_.has(k)).map(([, x]) => x), 'removed'),
+    changed: summarize([...now_].filter(([k]) => changedKeys.has(k)).map(([, x]) => x), 'changed'),
   };
 }
 
@@ -577,8 +712,14 @@ export interface ScanResult {
   changes: Omit<HistoryEntry, 'at'>;
 }
 
+export interface ScanOptions {
+  /** Where earlier copies of skill supporting files live. Without it, only SKILL.md and rule changes show lines. */
+  snapshots?: Snapshots;
+}
+
 /** Read-only inventory of rule files, skills, commands, subagents, hooks and MCP servers. No network requests. */
-export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}): ScanResult {
+export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}, options: ScanOptions = {}): ScanResult {
+  const { snapshots } = options;
   const errors: string[] = [];
   const now = nowIso();
   const roots = [...config.codeRoots, ...config.agentRoots].filter(r => !config.ignored.includes(r));
@@ -600,14 +741,14 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
   const byPath = resolveImports(files, errors);
   const origins = skillOrigins(found.config.get('skills-lock') ?? [], errors);
   const skills: FileRecord[] = [];
-  for (const p of [...found.skills].sort()) { try { skills.push(skillRecord(p, excluded, null, origins, vibe)); } catch (error) { errors.push(String(error)); } }
+  for (const p of [...found.skills].sort()) { try { skills.push(skillRecord(p, excluded, null, origins, vibe, snapshots)); } catch (error) { errors.push(String(error)); } }
   const plugins = enabledPlugins(errors);
   for (const plugin of plugins) {
     const dir = join(plugin.root, 'skills');
     if (!existsSync(dir)) continue;
     for (const child of readdirSync(dir).sort()) {
       const p = join(dir, child, SKILL_NAME);
-      if (existsSync(p)) { try { skills.push(skillRecord(p, excluded, plugin, origins, vibe)); } catch (error) { errors.push(String(error)); } }
+      if (existsSync(p)) { try { skills.push(skillRecord(p, excluded, plugin, origins, vibe, snapshots)); } catch (error) { errors.push(String(error)); } }
     }
   }
   const items: FileRecord[] = [...byPath.values(), ...skills];
@@ -622,9 +763,11 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}):
     }
     errors.push(`${root} could not be read; kept ${kept.length} files from the previous scan.`);
   }
-  const changes = trackChanges(previous, [...items, ...allExtras(extras)], now);
+  const changes = trackChanges(previous, [...items, ...allExtras(extras)], now, snapshots, excluded);
   let history = previous.history ?? [];
-  if (changes.added.length || changes.removed.length || changes.changed.length) history = [...history, { at: now, ...changes }].slice(-HISTORY_LIMIT);
+  if (changes.added.length || changes.removed.length || changes.changed.length) history = trimHistory([...history, { at: now, ...changes }].slice(-HISTORY_LIMIT));
+  // Copies are only needed for files the latest scan still has: the next change compares against these.
+  snapshots?.keep(new Set(items.flatMap(f => (f.skill?.files ?? []).filter(f => f.text).map(f => f.sha256))));
   const installed: InstalledPlugin[] = plugins.map(p => ({ id: p.id, agent: p.agent, version: p.version, path: p.root, installedAt: p.installedAt, homepage: p.homepage }));
   const inventory: Inventory = {
     scannedAt: now, baselineAt: previous.extrasTracked && previous.baselineAt ? previous.baselineAt : now, extrasTracked: true,
