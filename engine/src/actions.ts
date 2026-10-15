@@ -204,7 +204,7 @@ type ConflictEdit = (conflict: RuleConflict) => RuleConflict;
  */
 export function rescan(store: Store, config: ResolvedConfig, editConflict?: ConflictEdit): Analysis {
   const previous = store.inventory();
-  const { inventory } = scan(config, previous);
+  const { inventory } = scan(config, previous, { snapshots: store.snapshots });
   store.saveInventory(inventory);
   // Read the review only after the slow scan: a review running in another process (the CLI next to
   // the desktop app) saves answers meanwhile, and saving an older copy below would erase them.

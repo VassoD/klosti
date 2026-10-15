@@ -73,7 +73,7 @@ async function main(): Promise<void> {
   const port = values.port ? Number(values.port) : DEFAULT_PORT;
 
   const doScan = (): Inventory => {
-    const { inventory, changes } = scan(config, store.inventory());
+    const { inventory, changes } = scan(config, store.inventory(), { snapshots: store.snapshots });
     store.saveInventory(inventory);
     const counted = (n: number, word: string): string => `${n} ${word}`;
     console.log(`Scanned ${inventory.roots.length} folders: ${counted(inventory.primaryFileCount, 'rule files')}, ${counted(inventory.skillCount, 'skills')}, ${counted(inventory.extras.hooks.length, 'hooks')}, ${counted(inventory.extras.mcp.length, 'MCP servers')}.`);

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ActionEntry, Inventory, Judgements } from './types.ts';
+import { Snapshots } from './snapshots.ts';
 import type { UsageCache } from './usage.ts';
 
 const ACTIONS_LIMIT = 300;
@@ -12,6 +13,7 @@ export class Store {
   readonly actionsFile: string;
   readonly backupsDir: string;
   readonly usageFile: string;
+  readonly snapshots: Snapshots;
 
   constructor(readonly dir: string) {
     mkdirSync(dir, { recursive: true });
@@ -20,6 +22,7 @@ export class Store {
     this.actionsFile = join(dir, 'actions.json');
     this.backupsDir = join(dir, 'backups');
     this.usageFile = join(dir, 'usage.json');
+    this.snapshots = new Snapshots(join(dir, 'snapshots'));
   }
 
   private read<T>(file: string, fallback: T): T {

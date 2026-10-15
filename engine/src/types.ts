@@ -1,3 +1,4 @@
+import type { FileDiff } from './diff.ts';
 export type Agent = 'Claude' | 'Codex' | 'Cursor' | 'Gemini' | 'Vibe' | 'Other';
 export type Scope = 'User-wide' | 'Folder';
 export type RuleFamily = 'Claude' | 'Codex / shared' | 'Cursor' | 'Gemini' | 'Windsurf' | 'Copilot' | 'Referenced document' | 'Skill';
@@ -28,6 +29,18 @@ export interface SkillMeta {
   supportFiles: number;
   manualOnly: boolean;
   hiddenFromMenu: boolean;
+  /** Every other file in the skill folder, so a change to a reference file counts. Older inventories lack it. */
+  files?: SupportFile[];
+}
+
+/** A file in a skill folder besides SKILL.md. */
+export interface SupportFile {
+  /** Relative to the skill folder. */
+  path: string;
+  sha256: string;
+  bytes: number;
+  /** Text small enough to keep an earlier copy of, so its changes can be shown line by line. */
+  text: boolean;
 }
 
 /** A rule or skill file, with its full text. */
@@ -115,6 +128,12 @@ export interface ChangeSummary {
   /** One skill reached through links is one change: every agent and path it covers. Older entries lack these. */
   agents?: string[];
   paths?: string[];
+  /** Line counts and diffs per file. Older entries, and items without text such as MCP servers, lack them. */
+  linesAdded?: number;
+  linesRemoved?: number;
+  diffs?: FileDiff[];
+  /** The first lines of an added or removed file. */
+  preview?: string[];
 }
 
 export interface HistoryEntry {
