@@ -331,6 +331,26 @@ table.wins{width:100%;border-collapse:collapse;font-size:14px;background:var(--c
 .history li{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
 .change{display:inline-flex;gap:6px;align-items:baseline;margin:0 12px 4px 0}
 .change.removed{color:var(--muted);text-decoration:line-through}
+.change-list{margin:4px 0 0;font-size:14px;color:var(--ink-2)}
+.change-block{margin:0 0 6px}
+.change-block .change{margin-bottom:0}
+.delta{font:600 12px var(--mono);white-space:nowrap}
+.delta .plus{color:var(--ok)}
+.delta .minus{color:var(--high)}
+.fixes .change-diff{margin:4px 0 8px}
+.fixes .change-diff summary{font-size:13px;color:var(--ink-2);cursor:pointer}
+.diff-file{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:10px 0 4px;font-size:13px}
+.diff-file .muted{font-size:12px}
+.hunks{margin:0;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;font:12.5px/1.55 var(--mono);background:var(--card)}
+.hunks .ln{display:block;padding:0 10px 0 26px;white-space:pre-wrap;overflow-wrap:anywhere;position:relative;color:var(--ink-2)}
+.hunks .ln::before{position:absolute;left:10px;content:attr(data-sign);color:var(--muted)}
+.hunks .add{background:color-mix(in srgb,var(--ok) 12%,var(--card));color:var(--ink)}
+.hunks .add::before{color:var(--ok)}
+.hunks .del{background:color-mix(in srgb,var(--high) 10%,var(--card))}
+.hunks .del::before{color:var(--high)}
+.hunks .at{display:block;padding:2px 10px;font:600 11px var(--sans);color:var(--muted);background:var(--paper-2);border-top:1px solid var(--line)}
+.hunks .at:first-child{border-top:0}
+.diff-note{font-size:12.5px;color:var(--muted);margin:2px 0 0}
 .change .k{font-size:12px;color:var(--muted)}
 details{margin:10px 0;font-size:14px}
 summary{cursor:pointer}
@@ -778,10 +798,34 @@ function actionEntry(a,first,restoredBackups){
   const hint=a.kind==='trash'?' <span class="muted">Use Put Back in Finder to restore it.</span>':'';
   return`<li><div class="fix-head"><div><span class="muted">${esc(ACTION_TEXT[a.kind]||a.kind)}, ${whenLabel(a.at)}</span><br><b>${esc(what)}</b>${hint}</div>${restore}</div>${a.summary?`<p>${esc(a.summary)}</p>`:''}${diffs?`<details ${first?'open':''}><summary>See the change</summary>${diffs}</details>`:''}</li>`;
 }
+const DIFF_STATUS={added:'new file',changed:'changed',removed:'removed'};
+// Counts only, so older history entries without diffs simply show nothing here.
+function delta(c){
+  const a=c.linesAdded||0,r=c.linesRemoved||0;
+  if(!a&&!r)return'';
+  return`<span class="delta" aria-label="${a} lines added, ${r} lines removed">${a?`<span class="plus">+${a}</span>`:''}${a&&r?' ':''}${r?`<span class="minus">−${r}</span>`:''}</span>`;
+}
+function hunkLines(h){
+  return`<span class="at">Line ${h.newStart}</span>${h.lines.map(l=>{const sign=l[0],cls=sign==='+'?'add':sign==='-'?'del':'ctx',label=sign==='+'?'Added: ':sign==='-'?'Removed: ':'';return`<span class="ln ${cls}" data-sign="${sign==='-'?'−':sign}"><span class="sr-only">${label}</span>${esc(l.slice(1))||' '}</span>`;}).join('')}`;
+}
+function fileDiff(d,single){
+  const head=single?'':`<div class="diff-file"><span class="path">${esc(d.file)}</span><span class="muted">${DIFF_STATUS[d.status]||d.status}${d.added||d.removed?`, +${d.added} −${d.removed}`:''}</span></div>`;
+  const body=d.hunks&&d.hunks.length?`<pre class="hunks">${d.hunks.map(hunkLines).join('')}</pre>`:'';
+  const note=d.note?`<p class="diff-note">${esc(d.note)}</p>`:d.truncated?`<p class="diff-note">Some lines are left out to keep the history small.</p>`:'';
+  return head+body+note;
+}
+function changeDetail(c){
+  if(c.diffs&&c.diffs.length){
+    const single=c.diffs.length===1&&c.diffs[0].file==='SKILL.md';
+    return`<details class="change-diff"><summary>See the lines${c.diffs.length>1?` in ${c.diffs.length} files`:''}</summary>${c.diffs.map(d=>fileDiff(d,single)).join('')}</details>`;
+  }
+  if(c.preview&&c.preview.length)return`<details class="change-diff"><summary>${c.cls==='removed'?'See what was removed':'See the first lines'}</summary><pre class="hunks">${c.preview.map(l=>`<span class="ln ${c.cls==='removed'?'del':'add'}" data-sign="${c.cls==='removed'?'−':'+'}">${esc(l)||' '}</span>`).join('')}</pre></details>`;
+  return'';
+}
 function scanEntry(e,changes){
   const folderOf=p=>short(p).split('/').slice(0,-1).join('/').replace(/\/\.(?:claude|agents|codex|gemini|vibe|cursor)\/skills\/[^/]+$/,'')||'~';
-  const item=c=>{const t=c.cls==='removed'?null:D.things.find(x=>x.paths.includes(c.path));const agents=(c.agents||[c.agent]).map(agentName).join(', ');const folders=[...new Set((c.paths||[c.path]).map(folderOf))].join(', ');const via=(c.paths||[]).length>1?` <span class="k">(${c.paths.length} paths: ${esc(c.paths.map(short).join(', '))})</span>`:'';return`<span class="change ${c.cls}" title="${VERB[c.cls]}"><span aria-hidden="true">${SIGN[c.cls]}</span><span class="sr-only">${VERB[c.cls]}</span> ${t?`<button class="chip" data-thing="${t.id}">${esc(c.name)}</button>`:esc(c.name)} <span class="k">${esc(c.kind)}, ${esc(agents)}, in ${esc(folders)}</span>${via}</span>`;};
-  return`<li><div class="fix-head"><div><span class="muted">Noticed by a scan, ${whenLabel(e.at)}</span></div></div><p>${changes.map(item).join('')}</p></li>`;
+  const item=c=>{const t=c.cls==='removed'?null:D.things.find(x=>x.paths.includes(c.path));const agents=(c.agents||[c.agent]).map(agentName).join(', ');const folders=[...new Set((c.paths||[c.path]).map(folderOf))].join(', ');const via=(c.paths||[]).length>1?` <span class="k">(${c.paths.length} paths: ${esc(c.paths.map(short).join(', '))})</span>`:'';return`<div class="change-block"><span class="change ${c.cls}" title="${VERB[c.cls]}"><span aria-hidden="true">${SIGN[c.cls]}</span><span class="sr-only">${VERB[c.cls]}</span> ${t?`<button class="chip" data-thing="${t.id}">${esc(c.name)}</button>`:esc(c.name)} <span class="k">${esc(c.kind)}, ${esc(agents)}, in ${esc(folders)}</span>${via}</span> ${delta(c)}${changeDetail(c)}</div>`;};
+  return`<li><div class="fix-head"><div><span class="muted">Noticed by a scan, ${whenLabel(e.at)}</span></div></div><div class="change-list">${changes.map(item).join('')}</div></li>`;
 }
 function historyList(){
   const actions=D.actions||[];
@@ -982,7 +1026,7 @@ function aiSection(){
 }
 function changes(){
   return`<h1 class="lede">Changes</h1><p class="lede-sub">One timeline: what you fixed from this page, plus anything the scans noticed on their own, like a new skill or a rule file edited by hand. The watcher rescans when your skill or plugin folders change, and every 3 hours.</p>
-  <h2 class="section">History</h2><p class="section-sub">Rule edits made here can be restored from their backup. In scan entries, + means added, ~ changed and − removed.</p>${historyList()}
+  <h2 class="section">History</h2><p class="section-sub">Rule edits made here can be restored from their backup. In scan entries, + means added, ~ changed and − removed. Open an entry to see which lines changed, including files inside a skill folder.</p>${historyList()}
   <h2 class="section">About this scan</h2><p class="section-sub">Scanned ${dateLabel(D.scannedAt)}. ${D.errors.length?D.errors.length+' problems while reading folders.':'Every folder was readable.'} ${D.memories.length} Claude memory files were found and left unread.${D.review.lastAt?` Last AI review ${dateLabel(D.review.lastAt)}.`:''}</p>
   <details><summary>Folders scanned (${D.roots.length})</summary>${D.roots.map(r=>`<div class="path">${esc(short(r))}</div>`).join('')}</details>
   <details><summary>Limits</summary><ul>${D.limits.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><p class="muted">Skipped folders: ${esc(D.excluded.join(', '))}</p></details>`;
