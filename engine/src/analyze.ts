@@ -113,6 +113,7 @@ function ruleAgents(f: FileRecord, byPath: Map<string, FileRecord>, reached: Set
     return sortedStrings(new Set([...agents, ...(f.readers ?? [])])) as Agent[];
   }
   if (f.family === 'Referenced document') return reached.has(f.path) ? ['Claude'] : [];
+  if (f.family === 'Memory') return ['Claude'];
   return [f.family as Agent];
 }
 
@@ -132,7 +133,9 @@ function buildThings(data: Inventory, projectRoots: string[]): { things: Thing[]
   };
   for (const f of files) {
     if (!f.text.trim() && f.family === 'Referenced document') continue;
-    add(f, null, { kind: 'rule', name: basename(f.path), title: ruleTitle(f.text, f.path), agents: ruleAgents(f, byPath, reached, data.codexDocs?.fallbacks ?? []), description: '', body: f.text, sha: f.sha256, lines: f.lines, empty: !f.text.trim(), imports: f.imports as ImportRef[], family: f.family, loadsWhen: dirname(f.path) !== f.folder && f.scope !== 'User-wide' ? 'nested' : 'start' });
+    const memory = f.memory;
+    const loadsWhen = memory ? (memory.index ? 'start' : 'recall') : dirname(f.path) !== f.folder && f.scope !== 'User-wide' ? 'nested' : 'start';
+    add(f, null, { kind: 'rule', name: memory?.name ?? basename(f.path), title: memory?.name ?? ruleTitle(f.text, f.path), agents: ruleAgents(f, byPath, reached, data.codexDocs?.fallbacks ?? []), description: memory?.description ?? '', body: memory ? stripFrontmatter(f.text) : f.text, sha: f.sha256, lines: f.lines, empty: !f.text.trim(), imports: f.imports as ImportRef[], family: f.family, loadsWhen, ...(memory ? { memoryType: memory.type } : {}) });
   }
   for (const f of data.files) {
     if (f.family !== 'Skill' || !f.skill) continue;

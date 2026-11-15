@@ -64,10 +64,17 @@ const RULE_ORDER: Partial<Record<Agent, string>> = {
   Vibe: 'Mistral Vibe loads ~/.vibe/AGENTS.md and the AGENTS.md files from the working directory up to the trust root. Its docs say closer directories override more distant ones.',
 };
 
+/** Memory files are Claude's own notes. The index loads every session; the others only when Claude recalls them. */
+const placeLabel = (t: Thing): string => {
+  const where = t.global ? 'global' : 'project';
+  if (t.family !== 'Memory') return where;
+  return t.loadsWhen === 'recall' ? `${where} memory Claude wrote, read when it seems relevant` : `${where} memory index Claude wrote, loaded every session`;
+};
+
 function rulePrompt(stack: RuleStack, byId: Map<string, Thing>, projects: Map<string, ProjectRef>): string {
   const parts = stack.rules.map((id, n) => {
     const t = byId.get(id)!;
-    return `=== File ${n + 1}: ${short(t.paths[0] ?? '')} (${t.global ? 'global' : 'project'}) ===\n${t.body.slice(0, RULE_FILE_CHARS)}`;
+    return `=== File ${n + 1}: ${short(t.paths[0] ?? '')} (${placeLabel(t)}) ===\n${t.body.slice(0, RULE_FILE_CHARS)}`;
   });
   const order = RULE_ORDER[stack.agent] ?? 'Its documentation does not say how these files are combined or which one wins.';
   return `These instruction files all load into the same ${stack.agent} session ${where(stack.project, projects)}, in this order. ${order}
@@ -117,7 +124,7 @@ function instructionPrompt(stack: InstructionStack, byId: Map<string, Thing>, pr
   if (!skills.length) return null;
   const rules = stack.rules.map(id => {
     const t = byId.get(id)!;
-    return `=== Rule file: ${short(t.paths[0] ?? '')} (${t.global ? 'global' : 'project'})${tag(id)} ===\n${t.body.slice(0, RULE_FILE_CHARS)}`;
+    return `=== Rule file: ${short(t.paths[0] ?? '')} (${placeLabel(t)})${tag(id)} ===\n${t.body.slice(0, RULE_FILE_CHARS)}`;
   });
   const skillParts = skills.map(t => {
     const from = t.plugin ? `from the plugin ${t.plugin.split('@')[0]}, read-only` : t.global ? 'global' : 'project';

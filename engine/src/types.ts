@@ -1,7 +1,7 @@
 import type { FileDiff } from './diff.ts';
 export type Agent = 'Claude' | 'Codex' | 'Cursor' | 'Gemini' | 'Vibe' | 'Other';
 export type Scope = 'User-wide' | 'Folder';
-export type RuleFamily = 'Claude' | 'Codex / shared' | 'Cursor' | 'Gemini' | 'Windsurf' | 'Copilot' | 'Referenced document' | 'Skill';
+export type RuleFamily = 'Claude' | 'Codex / shared' | 'Cursor' | 'Gemini' | 'Windsurf' | 'Copilot' | 'Referenced document' | 'Skill' | 'Memory';
 export type SkillSource = 'plugin' | 'synced' | 'system' | 'user' | 'project';
 export type ThingKind = 'rule' | 'skill' | 'command' | 'subagent' | 'hook' | 'mcp' | 'output-style';
 export type Severity = 'high' | 'medium' | 'low';
@@ -43,7 +43,17 @@ export interface SupportFile {
   text: boolean;
 }
 
-/** A rule or skill file, with its full text. */
+/** What a Claude memory file says about itself in its front matter. */
+export interface MemoryMeta {
+  /** True for MEMORY.md, the index Claude loads into every session in the project. */
+  index: boolean;
+  name: string;
+  description: string;
+  /** user, feedback, project or reference. Null when the file does not say. */
+  type: string | null;
+}
+
+/** A rule, skill or memory file, with its full text. */
 export interface FileRecord {
   path: string;
   key: string;
@@ -62,6 +72,7 @@ export interface FileRecord {
   /** Agents that read this rule file besides the ones its name implies, such as Vibe for a project AGENTS.md. */
   readers?: Agent[];
   skill?: SkillMeta;
+  memory?: MemoryMeta;
   firstSeen?: string;
   changedAt?: string | null;
 }
@@ -152,10 +163,13 @@ export interface InstalledPlugin {
   homepage?: string | null;
 }
 
+/** A project's Claude memory folder. */
 export interface MemoryIndex {
   path: string;
   projectKey: string;
   topicFiles: number;
+  /** The folder Claude works in when it loads this memory. Null when that folder no longer exists, so the memory never loads. */
+  folder?: string | null;
 }
 
 export interface Inventory {
@@ -173,6 +187,8 @@ export interface Inventory {
   plugins: InstalledPlugin[];
   history: HistoryEntry[];
   memories: MemoryIndex[];
+  /** Set once memory files are scanned, so the first scan that reads them does not list each one as added. */
+  memoriesTracked?: boolean;
   limits: string[];
   /** Agents whose command or app was found. Inventories from before this field only had home folders to go on. */
   installedAgents?: Agent[];
@@ -227,7 +243,9 @@ export interface Thing {
   lines?: number;
   empty?: boolean;
   imports?: ImportRef[];
-  loadsWhen?: 'start' | 'nested';
+  /** start: every session. nested: when working in its folder. recall: when Claude judges the memory relevant. */
+  loadsWhen?: 'start' | 'nested' | 'recall';
+  memoryType?: string | null;
   source?: SkillSource;
   origin?: string | null;
   version?: string | null;
