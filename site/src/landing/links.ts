@@ -10,4 +10,7 @@ export const GUIDE_POST_URL = "https://www.vassi.fyi/writing/how-to-know-your-ha
 
 export const PLATFORM_NOTE = "For macOS 11 or later, on Macs with Apple silicon";
 
-export const CLI_NOTE = "Runs locally on macOS, Linux and Windows. Requires Node 20 or later. Mac app coming soon.";
+export const CLI_NOTE = "Runs locally on macOS, Linux and Windows. Requires Node 20 or later.";
+
+/** Installs the menu bar app from the latest GitHub release. Running it again updates the app. */
+export const MAC_INSTALL_COMMAND = "curl -fsSL https://klosti.vassi.fyi/install.sh | sh";
