@@ -61,6 +61,7 @@ button.chip:hover{border-color:var(--clay);color:var(--ink)}
 .scope.global{background:var(--clay-soft);color:var(--clay-ink)}
 .scope.project{background:var(--low-soft);color:var(--low)}
 .badge-new{font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-soft);border-radius:var(--radius-sm);padding:1px 7px}
+.badge-memory{font-size:11px;font-weight:600;color:var(--muted);background:var(--paper-2);border-radius:var(--radius-sm);padding:1px 7px}
 .sev{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
 .sev::before{content:"";width:8px;height:8px;border-radius:2px;background:currentColor}
 .sev.high{color:var(--high)}.sev.medium{color:var(--medium)}.sev.low{color:var(--low)}
@@ -471,6 +472,11 @@ if(!present.includes(state.lensAgent)&&present.length)state.lensAgent=present[0]
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=p=>String(p).replace(/^\/Users\/[^/]+\//,'~/');
 const plural=(n,k)=>`${n} ${n===1?KIND[k].one:KIND[k].many}`;
+const isMemory=t=>t.family==='Memory';
+/** A memory is filed as a rule, but Claude wrote it, and only the index loads into every session. */
+const kindOne=t=>isMemory(t)?(t.loadsWhen==='recall'?'memory':'memory index'):KIND[t.kind].one;
+const MEMORY_LOADS={start:'Claude loads it into every session in this project, and keeps it up to date itself.',recall:'Claude sees its name and description through the memory index, and reads it when it seems relevant. Claude wrote it and can change it.'};
+const memoryBadge=t=>isMemory(t)?' <span class="badge-memory">Memory</span>':'';
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const dateLabel=iso=>new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
 const inline=s=>esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
@@ -502,7 +508,7 @@ function scopeSentence(t){
   const where=t.projects.map(p=>p.name+(p.subpath?` (only in ${p.subpath})`:'')).join(', ');
   return t.kind==='hook'?`Runs for ${who} only inside ${where}.`:`${who} can use it only inside ${where}.`;
 }
-const thingChip=id=>{const t=byId.get(id);return t?`<button class="chip" data-thing="${t.id}" title="${esc(KIND[t.kind].one)}">${esc(t.name)}</button>`:'';};
+const thingChip=id=>{const t=byId.get(id);return t?`<button class="chip" data-thing="${t.id}" title="${esc(kindOne(t))}">${esc(t.name)}</button>`:'';};
 
 function navCounts(){
   const serious=live().filter(f=>f.severity==='high').length;
@@ -574,7 +580,8 @@ function lens(){
   const here=D.things.filter(t=>visible(t,agent,pid));
   const isPlugin=t=>!!t.plugin;
   const own=here.filter(t=>t.global&&!isPlugin(t)),plugin=here.filter(t=>t.global&&isPlugin(t)),local=here.filter(t=>!t.global);
-  const rules=here.filter(t=>t.kind==='rule'&&!t.empty).sort((a,b)=>(a.global===b.global?a.paths[0].length-b.paths[0].length:a.global?-1:1));
+  const recalled=here.filter(t=>t.kind==='rule'&&t.loadsWhen==='recall').sort((a,b)=>a.name.localeCompare(b.name));
+  const rules=here.filter(t=>t.kind==='rule'&&!t.empty&&t.loadsWhen!=='recall').sort((a,b)=>(a.global===b.global?a.paths[0].length-b.paths[0].length:a.global?-1:1));
   const emptyGlobals=here.filter(t=>t.kind==='rule'&&t.empty&&t.global);
   const emptyNote=emptyGlobals.map(t=>`<p class="muted" style="font-size:13px;margin:10px 0 0"><button class="chip" data-thing="${t.id}">${esc(short(t.paths[0]))}</button> exists but is empty, so ${esc(agent)} gets no global rules. Rules you add there apply in every project.</p>`).join('');
   const withRules=projectOpts.filter(p=>D.things.some(t=>t.kind==='rule'&&!t.empty&&t.agents.includes(agent)&&t.projects.some(x=>x.id===p.id)));
@@ -591,6 +598,7 @@ function lens(){
   <div class="lens-controls"><div class="seg" role="group" aria-label="Agent">${present.map(a=>`<button data-lens-agent="${a}" aria-pressed="${a===agent}">${esc(agentName(a))}</button>`).join('')}</div>
   <label><span class="sr-only">Project</span><select class="pick" id="lens-project"><option value="">No project (global only)</option>${projectOpts.map(p=>`<option value="${esc(p.id)}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>${pid&&API?`<button class="btn-quiet" data-ignore-folder="${esc(pid)}" title="Klosti will skip this folder. Bring it back under Changes.">Stop scanning this project</button>`:''}</div>
   ${thread}${emptyNote}${pickHint}
+  ${recalled.length?band(`Memories it can recall <span class="count-inline">${recalled.length}</span>`,`Notes ${esc(agentName(agent))} wrote for itself in this project. It sees each one listed in the memory index and reads the full note when it seems relevant.`,`<div class="tiles">${recalled.map(t=>`<button class="chip" data-thing="${t.id}" title="${esc(t.description)}">${esc(t.name)}${findingsFor(t.id).some(f=>f.severity!=='low')?' <span style="color:var(--high)">●</span>':''}</button>`).join('')}</div>`):''}
   ${band(`Available on demand <span class="count-inline">${skills.length}</span>`,`${esc(agent)} sees each name and description, and reads the full skill only when your request matches or you call it by name.`,(budget?skillMeter(budget,agent):'')+(skills.length?grouped(skills):'<p class="muted">No skills here.</p>'))}
   ${band('Runs automatically','Hooks are scripts, not instructions. They run on events such as editing a file or starting a session, whatever the model decides.',hooks.length?`<div class="rows">${hooks.map(row).join('')}</div>`:'<p class="muted">No hooks run here.</p>')}
   ${band('Connected tools','MCP servers give the agent extra tools and data.',mcp.length?`<div class="tiles">${mcp.map(t=>`<button class="chip" data-thing="${t.id}">${esc(t.name)} <span class="muted">${esc(t.mcpScope)}</span></button>`).join('')}</div>`:'<p class="muted">No MCP servers configured here. Account connectors from claude.ai are not stored on disk, so they are not listed.</p>')}
@@ -600,7 +608,8 @@ function lens(){
 
 const LAYERS=[{id:'global',name:'Global',note:'Your own files, plus anything built in or synced'},{id:'plugin',name:'Plugins',note:''},{id:'project',name:'',note:'Only here, on top of the layers above'}];
 function originLabel(t){
-  const kind=cap(KIND[t.kind].one);
+  const kind=cap(kindOne(t));
+  if(isMemory(t))return`${kind} Claude wrote for this project`;
   if(t.source==='synced')return`${kind} synced from claude.ai`;
   if(t.source==='system')return`${kind} built into ${t.agents[0]}`;
   if(t.plugin||t.origin)return`${kind} from ${packOf(t).name}`;
@@ -620,7 +629,7 @@ function threadView(here,rules,issues,pid,pname){
     const name=l.id==='project'?(pid?pname:'No project'):l.name;
     const note=l.id==='plugin'?([...new Set(items.map(t=>pluginName(t.plugin)))].join(', ')||'No plugins enabled'):l.id==='project'&&!pid?'Pick a project to add its own layer':l.note;
     const beads=[...items.filter(t=>ruleN.has(t.id)).sort((a,b)=>ruleN.get(a.id)-ruleN.get(b.id)),...items.filter(t=>!ruleN.has(t.id)&&flagged.has(t.id)).sort((a,b)=>a.name.localeCompare(b.name))];
-    const list=beads.map(t=>{const isRule=ruleN.has(t.id);const path=short(t.paths.find(p=>pid?p.startsWith(pid):true)||t.paths[0]);return`<li class="bead${isRule?'':' is-demand'}" data-bead="${t.id}"${isRule?` data-n="${ruleN.get(t.id)}"`:''}><button class="chip" data-thing="${t.id}">${esc(t.name)}</button><span class="kindname">${isRule?(t.loadsWhen==='nested'?'rule file, loads when working in that folder':'rule file'):esc(originLabel(t))}</span>${isRule?`<span class="path">${esc(path)}</span>`:''}</li>`;}).join('');
+    const list=beads.map(t=>{const isRule=ruleN.has(t.id);const path=short(t.paths.find(p=>pid?p.startsWith(pid):true)||t.paths[0]);return`<li class="bead${isRule?'':' is-demand'}" data-bead="${t.id}"${isRule?` data-n="${ruleN.get(t.id)}"`:''}><button class="chip" data-thing="${t.id}">${esc(t.name)}</button><span class="kindname">${isRule?(isMemory(t)?'memory index Claude wrote':t.loadsWhen==='nested'?'rule file, loads when working in that folder':'rule file'):esc(originLabel(t))}</span>${isRule?`<span class="path">${esc(path)}</span>`:''}</li>`;}).join('');
     const empty=!items.length&&(l.id!=='project'||!pid);
     return`<section class="layer l-${l.id}${empty?' is-empty':''}"><div class="layer-head"><h3>${esc(name)}</h3><p>${esc(note)}</p>${items.length?`<span class="tally">${tally(items)}</span>`:''}</div>${list?`<ol class="beads">${list}</ol>`:items.length?'<p class="layer-empty">No rule files here, and nothing with an issue.</p>':''}</section>`;
   }).join('');
@@ -688,7 +697,7 @@ function skillMeter(b,agent){
 function row(t){
   const flags=findingsFor(t.id).filter(f=>f.severity!=='low').length;
   const desc=t.kind==='hook'?(t.description||t.command):t.kind==='mcp'?`${t.transport}, ${t.target}`:(t.description||t.title);
-  return`<button class="row" data-thing="${t.id}"><span class="name">${esc(t.name)}${isNew(t)?'<span class="badge-new">New</span>':''}</span><span class="desc">${esc(desc)}</span><span class="right">${flags?`<span class="flag">${flags} issue${flags>1?'s':''}</span>`:''}${agentList(t.agents)}${scopeChip(t)}</span></button>`;
+  return`<button class="row" data-thing="${t.id}"><span class="name">${esc(t.name)}${memoryBadge(t)}${isNew(t)?'<span class="badge-new">New</span>':''}</span><span class="desc">${esc(desc)}</span><span class="right">${flags?`<span class="flag">${flags} issue${flags>1?'s':''}</span>`:''}${agentList(t.agents)}${scopeChip(t)}</span></button>`;
 }
 function inventory(){
   const q=state.query.toLowerCase();
@@ -1027,11 +1036,17 @@ function aiSection(){
 function changes(){
   return`<h1 class="lede">Changes</h1><p class="lede-sub">One timeline: what you fixed from this page, plus anything the scans noticed on their own, like a new skill or a rule file edited by hand. The watcher rescans when your skill or plugin folders change, and every 3 hours.</p>
   <h2 class="section">History</h2><p class="section-sub">Rule edits made here can be restored from their backup. In scan entries, + means added, ~ changed and − removed. Open an entry to see which lines changed, including files inside a skill folder.</p>${historyList()}
-  <h2 class="section">About this scan</h2><p class="section-sub">Scanned ${dateLabel(D.scannedAt)}. ${D.errors.length?D.errors.length+' problems while reading folders.':'Every folder was readable.'} ${D.memories.length} Claude memory files were found and left unread.${D.review.lastAt?` Last AI review ${dateLabel(D.review.lastAt)}.`:''}</p>
+  <h2 class="section">About this scan</h2><p class="section-sub">Scanned ${dateLabel(D.scannedAt)}. ${D.errors.length?D.errors.length+' problems while reading folders.':'Every folder was readable.'} ${memoryLine()}${D.review.lastAt?` Last AI review ${dateLabel(D.review.lastAt)}.`:''}</p>
   <details><summary>Folders scanned (${D.roots.length})</summary>${D.roots.map(r=>`<div class="path">${esc(short(r))}</div>`).join('')}</details>
   <details><summary>Limits</summary><ul>${D.limits.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><p class="muted">Skipped folders: ${esc(D.excluded.join(', '))}</p></details>`;
 }
 
+function memoryLine(){
+  const read=D.things.filter(isMemory).reduce((n,t)=>n+t.paths.length,0);
+  const gone=(D.memories||[]).filter(m=>m.folder===null).length;
+  if(!read&&!gone)return'';
+  return`Read ${read} Claude memory ${read===1?'file':'files'}, filed under the project each belongs to.${gone?` ${gone} memory ${gone===1?'folder belongs':'folders belong'} to folders that no longer exist, so Claude never loads ${gone===1?'it':'them'}.`:''}`;
+}
 const WHAT={rule:'Standing instructions loaded into every session where it applies.',skill:'Know-how the agent loads when a request matches its description, or when you call it by name.',command:'A prompt you run by typing its name after a slash.',subagent:'A helper the agent can hand work to. It runs in its own context.',hook:'A script that runs automatically on an event. The model does not decide.',mcp:'A server that gives the agent extra tools.','output-style':'Changes tone and format for a whole session.'};
 /** Uses recorded under any name the sessions may have used: "name", or "plugin:name" for plugin skills. */
 function usageFor(t){
@@ -1080,7 +1095,7 @@ function showThing(id){
   const t=byId.get(id);if(!t)return;
   const fs=findingsFor(id);
   const pack=['skill','command','subagent'].includes(t.kind)?packOf(t):null;
-  const facts=[['Where it applies',esc(scopeSentence(t))],['Agents',t.agents.length?agentList(t.agents):'None detected'],pack&&['Came from',esc(pack.name)+(t.version?` <span class="muted">version ${esc(t.version)}</span>`:'')],sourceUrl(t)&&['Website',`<a href="${esc(sourceUrl(t))}" data-open-url="${esc(sourceUrl(t))}" target="_blank" rel="noopener">${esc(sourceUrl(t).replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`],t.kind==='hook'&&['Event',esc(t.event)+(t.matcher?` <span class="muted">for tools matching ${esc(t.matcher)}</span>`:'')],t.kind==='mcp'&&['Connection',`${esc(t.transport)}, ${esc(t.target)}`],t.kind==='mcp'&&['Scope',esc(t.mcpScope)],t.manualOnly&&['Invocation','Manual only. The model will not load it on its own.'],t.firstSeen&&['First seen',dateLabel(t.firstSeen)+(t.changedAt?`, updated ${dateLabel(t.changedAt)}`:'')]].filter(Boolean);
+  const facts=[['Where it applies',esc(scopeSentence(t))],['Agents',t.agents.length?agentList(t.agents):'None detected'],pack&&['Came from',esc(pack.name)+(t.version?` <span class="muted">version ${esc(t.version)}</span>`:'')],sourceUrl(t)&&['Website',`<a href="${esc(sourceUrl(t))}" data-open-url="${esc(sourceUrl(t))}" target="_blank" rel="noopener">${esc(sourceUrl(t).replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`],t.kind==='hook'&&['Event',esc(t.event)+(t.matcher?` <span class="muted">for tools matching ${esc(t.matcher)}</span>`:'')],t.kind==='mcp'&&['Connection',`${esc(t.transport)}, ${esc(t.target)}`],t.kind==='mcp'&&['Scope',esc(t.mcpScope)],t.manualOnly&&['Invocation','Manual only. The model will not load it on its own.'],isMemory(t)&&['Loads',esc(MEMORY_LOADS[t.loadsWhen]||MEMORY_LOADS.start)],isMemory(t)&&t.memoryType&&['Memory type',esc(t.memoryType)],t.firstSeen&&['First seen',dateLabel(t.firstSeen)+(t.changedAt?`, updated ${dateLabel(t.changedAt)}`:'')]].filter(Boolean);
   const locs=(t.locations||[]).map(l=>{
     const removeLabel=l.linkTarget?'Remove link':'Move to Trash';
     const who=(t.locations.length>1&&l.agents?.length)?` <span class="muted">for ${esc(l.agents.join(' and '))}</span>`:'';
@@ -1090,7 +1105,7 @@ function showThing(id){
   const issues=fs.length?`<h4>Issues</h4><div class="findings">${fs.map(f=>findingCard(f,true)).join('')}</div>`:'';
   const share=shareNote(t);
   const body=t.kind==='hook'?`<h4>Command</h4><code class="cmd">${esc(t.command)}</code>`:t.body?`<h4>${t.kind==='rule'?'Full text':'Instructions'}</h4><div class="markdown">${md(t.body)}</div>`:'';
-  $('drawer-kind').textContent=cap(KIND[t.kind].one);
+  $('drawer-kind').textContent=cap(kindOne(t));
   $('drawer-body').innerHTML=`<div class="agents">${isNew(t)?'<span class="badge-new">New</span>':''}${scopeChip(t)}</div><h2 id="drawer-title">${esc(t.kind==='rule'?t.title:t.name)}</h2><p class="what">${esc(t.description&&t.kind!=='mcp'?t.description:WHAT[t.kind])}</p><dl class="facts">${facts.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}<dt>${(t.locations||[]).length>1?'Files':'File'}</dt><dd>${locs}</dd></dl>${share}${removalNote(t)}${issues}${skillHistory(t)}${body}`;
   if(!$('drawer').open)$('drawer').showModal();
   $('drawer').scrollTop=0;

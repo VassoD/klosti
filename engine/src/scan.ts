@@ -1,17 +1,18 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
 import { AGENT_DIRS, expandPath, HOME, installedAgents, MANAGED_CLAUDE_MD, type ResolvedConfig } from './config.ts';
 import { lineDiff, previewLines, type FileDiff } from './diff.ts';
 import { SNAPSHOT_MAX_BYTES, type Snapshots } from './snapshots.ts';
-import type { Agent, ChangeSummary, Extra, Extras, FileRecord, HistoryEntry, SupportFile, HookExtra, InstalledPlugin, Inventory, McpExtra, McpScope, MarkdownExtra, MemoryIndex, RuleFamily, Scope, SkillSource } from './types.ts';
+import type { Agent, ChangeSummary, Extra, Extras, FileRecord, HistoryEntry, SupportFile, HookExtra, InstalledPlugin, Inventory, McpExtra, McpScope, MarkdownExtra, MemoryIndex, MemoryMeta, RuleFamily, Scope, SkillSource } from './types.ts';
 
 const RULE_NAMES = new Set(['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md', 'GEMINI.md', '.cursorrules', '.windsurfrules', 'copilot-instructions.md']);
 const RULE_DIRS = ['/.claude/rules/', '/.cursor/rules/', '/.windsurf/rules/'];
 const HOME_RULE_FILES = ['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md', 'GEMINI.md'];
 const SKILL_NAME = 'SKILL.md';
 const SKILLS_LOCK = 'skills-lock.json';
+const MEMORY_INDEX = 'MEMORY.md';
 const HISTORY_LIMIT = 200;
 /** Only the latest entries keep their line diffs; older ones keep the counts. The history is embedded in the page. */
 const DIFF_HISTORY_LIMIT = 30;
@@ -541,9 +542,9 @@ function collectExtras(config: Map<ConfigKind, Set<string>>, plugins: PluginRoot
 
 type Tracked = FileRecord | Extra;
 const allExtras = (extras: Partial<Extras> | undefined): Extra[] => Object.values(extras ?? {}).flat() as Extra[];
-const trackedKind = (x: Tracked): string => ('family' in x ? (x.family === 'Skill' ? 'skill' : 'rule') : x.kind);
+const trackedKind = (x: Tracked): string => ('family' in x ? (x.family === 'Skill' ? 'skill' : x.family === 'Memory' ? 'memory' : 'rule') : x.kind);
 const trackedName = (x: Tracked): string => ('family' in x ? (x.skill?.name ?? basename(x.path)) : x.name);
-const trackedAgent = (x: Tracked): string => ('family' in x ? (x.skill?.agent ?? x.family) : x.agent);
+const trackedAgent = (x: Tracked): string => ('family' in x ? (x.skill?.agent ?? (x.family === 'Memory' ? 'Claude' : x.family)) : x.agent);
 const trackedAgents = (x: Tracked): string[] => ('family' in x && x.skill?.agents ? x.skill.agents : [trackedAgent(x)]);
 /** A skill reached through links is one file, so every path to it shares this key. */
 const realKey = (x: Tracked): string => ('family' in x && x.family === 'Skill' ? x.realPath ?? x.path : x.key);
@@ -642,9 +643,11 @@ export function trimHistory(history: HistoryEntry[]): HistoryEntry[] {
 function trackChanges(previous: Partial<Inventory>, current: Tracked[], now: string, snapshots?: Snapshots, excluded = new Set<string>()): Omit<HistoryEntry, 'at'> {
   const old = new Map<string, Tracked>([...(previous.files ?? []), ...allExtras(previous.extras)].map(x => [x.key ?? x.path, x]));
   const changedKeys = new Set<string>();
+  // Memory files already existed before Klosti started reading them, so they are not new on that first scan.
+  const untrackedMemory = (x: Tracked): boolean => !previous.memoriesTracked && 'family' in x && x.family === 'Memory';
   for (const item of current) {
     const before = old.get(item.key);
-    item.firstSeen = before?.firstSeen ?? now;
+    item.firstSeen = before?.firstSeen ?? (untrackedMemory(item) && previous.baselineAt ? previous.baselineAt : now);
     item.changedAt = before?.changedAt ?? null;
     if (before && isChanged(before, item, excluded)) { item.changedAt = now; changedKeys.add(item.key); }
   }
@@ -672,7 +675,7 @@ function trackChanges(previous: Partial<Inventory>, current: Tracked[], now: str
   };
   const now_ = new Map(current.map(x => [x.key, x]));
   return {
-    added: summarize([...now_].filter(([k]) => !old.has(k)).map(([, x]) => x), 'added'),
+    added: summarize([...now_].filter(([k, x]) => !old.has(k) && !untrackedMemory(x)).map(([, x]) => x), 'added'),
     removed: summarize([...old].filter(([k]) => !now_.has(k)).map(([, x]) => x), 'removed'),
     changed: summarize([...now_].filter(([k]) => changedKeys.has(k)).map(([, x]) => x), 'changed'),
   };
@@ -701,10 +704,71 @@ function resolveImports(files: FileRecord[], errors: string[]): Map<string, File
   return byPath;
 }
 
-function memoryIndexes(): MemoryIndex[] {
+/** Claude Code names a project's folder under ~/.claude/projects after its path, with every other character than a letter or digit turned into a dash. */
+export const encodeProjectKey = (path: string): string => path.replace(/[^a-zA-Z0-9]/g, '-');
+
+/**
+ * The folder a ~/.claude/projects key stands for. The encoding loses slashes, dots and dashes alike, so the key is
+ * matched against real folders one level at a time. Null when no existing folder matches.
+ */
+export function projectFolderFor(key: string): string | null {
+  const isDir = (path: string): boolean => { try { return statSync(path).isDirectory(); } catch { return false; } };
+  const walk = (dir: string): string | null => {
+    let names: string[];
+    try { names = readdirSync(dir).sort(); } catch { return null; }
+    for (const name of names) {
+      const child = join(dir, name);
+      const encoded = encodeProjectKey(child);
+      if (encoded === key && isDir(child)) return child;
+      if (key.startsWith(`${encoded}-`) && isDir(child)) {
+        const found = walk(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return walk(parse(HOME).root);
+}
+
+/** The memory's type sits under `metadata:` in newer files and at the top level in older ones. */
+function memoryMeta(path: string, text: string): MemoryMeta {
+  const meta = frontmatter(text);
+  const block = /^---\s*\n([\s\S]*?)\n---/.exec(text)?.[1] ?? '';
+  const type = /^\s*type:\s*["']?([A-Za-z-]+)/m.exec(block)?.[1] ?? null;
+  const index = basename(path) === MEMORY_INDEX;
+  return { index, name: index ? 'Memory index' : meta.name || basename(path, '.md'), description: meta.description ?? '', type };
+}
+
+interface Memories {
+  folders: MemoryIndex[];
+  files: FileRecord[];
+}
+
+/**
+ * Claude's own notes per project, from ~/.claude/projects/<key>/memory/. MEMORY.md loads into every session in
+ * that project; Claude opens the other files when they look relevant. Each file is placed in the project it belongs to.
+ */
+function memories(ignored: string[], errors: string[]): Memories {
   const projects = join(HOME, '.claude', 'projects');
-  if (!existsSync(projects)) return [];
-  return readdirSync(projects).sort().map(key => join(projects, key, 'memory', 'MEMORY.md')).filter(p => existsSync(p)).map(p => ({ path: p, projectKey: basename(dirname(dirname(p))), topicFiles: readdirSync(dirname(p)).filter(n => n.endsWith('.md')).length }));
+  const out: Memories = { folders: [], files: [] };
+  if (!existsSync(projects)) return out;
+  for (const key of readdirSync(projects).sort()) {
+    const dir = join(projects, key, 'memory');
+    let names: string[];
+    try { names = readdirSync(dir).filter(n => n.endsWith('.md')).sort(); } catch { continue; }
+    if (!names.length) continue;
+    const folder = projectFolderFor(key);
+    out.folders.push({ path: join(dir, MEMORY_INDEX), projectKey: key, topicFiles: names.filter(n => n !== MEMORY_INDEX).length, folder });
+    if (!folder || ignored.some(i => isInside(folder, i))) continue;
+    for (const name of names) {
+      const path = join(dir, name);
+      try {
+        const file = record(path, 'Memory');
+        out.files.push({ ...file, scope: 'Folder', folder, memory: memoryMeta(path, file.text) });
+      } catch (error) { errors.push(String(error)); }
+    }
+  }
+  return out;
 }
 
 export interface ScanResult {
@@ -751,7 +815,9 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}, 
       if (existsSync(p)) { try { skills.push(skillRecord(p, excluded, plugin, origins, vibe, snapshots)); } catch (error) { errors.push(String(error)); } }
     }
   }
-  const items: FileRecord[] = [...byPath.values(), ...skills];
+  // After imports, so a memory never pulls in @file references: Claude does not follow them there.
+  const memory = memories(config.ignored, errors);
+  const items: FileRecord[] = [...byPath.values(), ...skills, ...memory.files];
   const extras = collectExtras(found.config, plugins, vibe, errors);
   // Keep the last known entries for unreadable roots so a blocked scan does not look like deletions.
   const known = new Set([...items, ...allExtras(extras)].map(x => x.key));
@@ -772,7 +838,7 @@ export function scan(config: ResolvedConfig, previous: Partial<Inventory> = {}, 
   const inventory: Inventory = {
     scannedAt: now, baselineAt: previous.extrasTracked && previous.baselineAt ? previous.baselineAt : now, extrasTracked: true,
     roots, excluded: config.excluded, ignored: config.ignored, errors, files: items, extras, primaryFileCount: files.length, skillCount: skills.length,
-    plugins: installed, history, memories: memoryIndexes(), limits: LIMITS, installedAgents: installedAgents() as Agent[], codexDocs: codex,
+    plugins: installed, history, memories: memory.folders, memoriesTracked: true, limits: LIMITS, installedAgents: installedAgents() as Agent[], codexDocs: codex,
   };
   return { inventory, changes };
 }
