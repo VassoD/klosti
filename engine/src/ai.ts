@@ -5,10 +5,18 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { z } from 'zod';
-import { HOME, readAiBackend } from './config.ts';
+import { HOME, readAiBackend, readAiConsent, readAiModel } from './config.ts';
 
-/** Override with KLOSTI_MODEL, for example claude-sonnet-5-5 for lower cost. Codex and Vibe use their own default model. */
-export const AI_MODEL = process.env.KLOSTI_MODEL ?? process.env.AGENT_RULEBOOK_MODEL ?? 'claude-opus-5-5';
+export const DEFAULT_AI_MODEL = 'claude-opus-5-5';
+/** What Settings offers for Claude Code and the Anthropic API. Codex and Vibe answer with their own default model. */
+export const AI_MODELS = [
+  { id: 'claude-opus-5-5', label: 'Opus 5.5', note: 'Most thorough' },
+  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', note: 'Faster, and uses less of your plan' },
+] as const;
+const MODEL_FROM_ENV = process.env.KLOSTI_MODEL ?? process.env.AGENT_RULEBOOK_MODEL;
+/** The environment wins, so existing scripts keep working; otherwise the choice in Settings. Read on every call. */
+export const aiModel = (): string => MODEL_FROM_ENV ?? readAiModel() ?? DEFAULT_AI_MODEL;
+const usesModel = (backend: AiBackend): boolean => backend === 'claude-code' || backend === 'api';
 const MAX_TOKENS = 16000;
 const CALL_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
@@ -22,6 +30,13 @@ const VIBE_NO_TOOLS = 'klosti-no-tools';
 export const AI_BACKENDS = ['claude-code', 'api', 'codex', 'vibe'] as const;
 export type AiBackend = typeof AI_BACKENDS[number];
 export const AI_BACKEND_LABELS: Record<AiBackend, string> = { 'claude-code': 'Claude Code', api: 'Anthropic API', codex: 'Codex', vibe: 'Mistral Vibe' };
+/** Who receives the text, and on whose account, for the question asked before the first call. */
+export const AI_BACKEND_PROVIDERS: Record<AiBackend, string> = {
+  'claude-code': 'Anthropic, through your Claude Code login',
+  api: 'Anthropic, with your API key',
+  codex: 'OpenAI, through your Codex login',
+  vibe: 'Mistral AI, through your Mistral Vibe login',
+};
 
 export class AiUnavailableError extends Error {
   override name = 'AiUnavailableError';
@@ -31,6 +46,11 @@ export class AiRefusedError extends Error {
 }
 export class AiResponseError extends Error {
   override name = 'AiResponseError';
+}
+/** The user has not yet allowed this tool to receive their files. The page asks, then tries again. */
+export class AiConsentRequiredError extends Error {
+  override name = 'AiConsentRequiredError';
+  readonly code = 'AI_CONSENT_REQUIRED';
 }
 
 export interface AiResult<T> {
@@ -57,16 +77,45 @@ const hasAnthropicKey = (): boolean => !!(process.env.ANTHROPIC_API_KEY || proce
 const isAvailable = (backend: AiBackend): boolean => (backend === 'api' ? hasAnthropicKey() : !!findCli(CLI_NAMES[backend]));
 
 export interface AiOption { id: AiBackend; label: string; available: boolean }
-export interface AiAvailability { via: AiBackend | null; label: string | null; detail: string; options: AiOption[] }
+export interface AiAvailability {
+  via: AiBackend | null;
+  label: string | null;
+  detail: string;
+  options: AiOption[];
+  /** Who receives the text for the tool in use. */
+  provider: string | null;
+  /** Whether the user allowed the tool in use to receive their files. */
+  consented: boolean;
+  /** Every tool the user has allowed. */
+  consents: AiBackend[];
+  /** The model the tool in use answers with, or null when the tool picks its own. */
+  model: string | null;
+  /** True when KLOSTI_MODEL sets the model, so Settings cannot change it. */
+  modelFromEnv: boolean;
+  models: typeof AI_MODELS;
+}
 
 /** The chosen backend when it is installed, otherwise the first one found, Claude Code first so existing setups keep working. */
 export function aiAvailability(): AiAvailability {
   const options = AI_BACKENDS.map(id => ({ id, label: AI_BACKEND_LABELS[id], available: isAvailable(id) }));
   const chosen = readAiBackend();
+  const consents = readAiConsent().filter((c): c is AiBackend => (AI_BACKENDS as readonly string[]).includes(c));
+  const common = { options, consents, modelFromEnv: MODEL_FROM_ENV !== undefined, models: AI_MODELS };
   const preferred = options.find(o => o.id === chosen && o.available) ?? options.find(o => o.available) ?? null;
-  if (!preferred) return { via: null, label: null, detail: 'Install Claude Code, Codex or Mistral Vibe, or set ANTHROPIC_API_KEY, to use AI features.', options };
+  if (!preferred) return { ...common, via: null, label: null, provider: null, consented: false, model: null, detail: 'Install Claude Code, Codex or Mistral Vibe, or set ANTHROPIC_API_KEY, to use AI features.' };
   const missing = chosen && chosen !== preferred.id ? ` ${AI_BACKEND_LABELS[chosen as AiBackend] ?? chosen} is not installed, so ${preferred.label} is used.` : '';
-  return { via: preferred.id, label: preferred.label, detail: `AI review uses ${preferred.label}.${missing}`, options };
+  return { ...common, via: preferred.id, label: preferred.label, provider: AI_BACKEND_PROVIDERS[preferred.id], consented: consents.includes(preferred.id), model: usesModel(preferred.id) ? aiModel() : null, detail: `AI review uses ${preferred.label}.${missing}` };
+}
+
+/**
+ * The tool to use, once the user has allowed it to receive their files. The app asks first; this refuses otherwise,
+ * so no request path can send files without that answer.
+ */
+export function requireAiConsent(): AiBackend {
+  const { via, label, detail, consented } = aiAvailability();
+  if (!via) throw new AiUnavailableError(detail);
+  if (!consented) throw new AiConsentRequiredError(`Allow ${label} to receive your files first.`);
+  return via;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
@@ -145,12 +194,12 @@ async function inScratch<T>(work: (dir: string) => Promise<T>): Promise<T> {
 
 /** Headless Claude Code with no settings, plugins, hooks, MCP servers or tools, so only the prompt is in play. */
 const askViaClaudeCode = <T>(cli: string, prompt: string, schema: z.ZodType<T>): Promise<AiResult<T>> => inScratch(async scratch => {
-  const args = ['-p', '--tools', '', '--disable-slash-commands', '--strict-mcp-config', '--no-session-persistence', '--setting-sources', '', '--model', AI_MODEL, '--output-format', 'json', '--json-schema', JSON.stringify(cliSchema(schema))];
+  const args = ['-p', '--tools', '', '--disable-slash-commands', '--strict-mcp-config', '--no-session-persistence', '--setting-sources', '', '--model', aiModel(), '--output-format', 'json', '--json-schema', JSON.stringify(cliSchema(schema))];
   const { code, stdout, stderr } = await runner(cli, args, prompt, scratch, CALL_TIMEOUT_MS);
   if (code !== 0) throw failure('Claude Code', code, stdout, stderr);
   const reply = CliReply.parse(JSON.parse(stdout));
   if (reply.is_error || reply.structured_output === undefined) throw new AiResponseError(String(reply.result ?? 'No structured answer').slice(0, 300));
-  return { value: schema.parse(reply.structured_output), costUsd: reply.total_cost_usd ?? 0, via: 'claude-code', model: AI_MODEL };
+  return { value: schema.parse(reply.structured_output), costUsd: reply.total_cost_usd ?? 0, via: 'claude-code', model: aiModel() };
 });
 
 /**
@@ -188,7 +237,7 @@ const askViaVibe = <T>(cli: string, prompt: string, schema: z.ZodType<T>): Promi
 async function askViaApi<T>(prompt: string, schema: z.ZodType<T>): Promise<AiResult<T>> {
   const client = new Anthropic({ timeout: CALL_TIMEOUT_MS, maxRetries: 2 });
   const response = await client.beta.messages.parse({
-    model: AI_MODEL,
+    model: aiModel(),
     max_tokens: MAX_TOKENS,
     betas: [FALLBACK_BETA],
     fallbacks: 'default',
@@ -197,7 +246,7 @@ async function askViaApi<T>(prompt: string, schema: z.ZodType<T>): Promise<AiRes
   });
   if (response.stop_reason === 'refusal') throw new AiRefusedError('The model declined this request.');
   if (response.parsed_output == null) throw new AiResponseError('The answer did not match the expected format.');
-  return { value: response.parsed_output as T, costUsd: 0, via: 'api', model: AI_MODEL };
+  return { value: response.parsed_output as T, costUsd: 0, via: 'api', model: aiModel() };
 }
 
 const isRetryable = (error: unknown): boolean => {

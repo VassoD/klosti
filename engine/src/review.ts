@@ -7,6 +7,8 @@ import type { Store } from './store.ts';
 import type { Agent, Analysis, InstructionStack, Judgements, ProjectRef, RuleStack, SkillContext, Thing } from './types.ts';
 
 const PARALLEL_CALLS = 3;
+/** A rough rule of thumb for English text, used only for the estimate shown before a review. */
+export const CHARS_PER_TOKEN = 4;
 const DESCRIPTION_CHARS = 400;
 const RULE_FILE_CHARS = 30000;
 const STYLE = 'Write for a busy developer in plain English. Short sentences. Never use em dashes. Do not invent facts that are not in the text.';

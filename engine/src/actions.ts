@@ -4,9 +4,9 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkS
 import { platform } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { z } from 'zod';
-import { AI_BACKENDS, AI_BACKEND_LABELS, aiAvailability, askAi, type AiBackend } from './ai.ts';
+import { AI_BACKENDS, AI_BACKEND_LABELS, AI_MODELS, aiAvailability, askAi, requireAiConsent, type AiBackend } from './ai.ts';
 import { analyze, short } from './analyze.ts';
-import { AGENT_DIRS, CONFIG_PATH, DEFAULT_CODE_DIRS, expandPath, HOME, KNOWN_AGENTS, saveIgnored, saveUserSettings, type ResolvedConfig } from './config.ts';
+import { AGENT_DIRS, CONFIG_PATH, DEFAULT_CODE_DIRS, expandPath, HOME, KNOWN_AGENTS, readAiConsent, saveIgnored, saveUserSettings, type ResolvedConfig } from './config.ts';
 import { nowIso, posix, scan } from './scan.ts';
 import type { Store } from './store.ts';
 import type { Analysis, Finding, Inventory, Judgements, Quote, RuleConflict, Thing } from './types.ts';
@@ -304,6 +304,7 @@ export class Actions {
   }
 
   async proposeFix(findingId: string): Promise<ActionReply> {
+    requireAiConsent();
     const analysis = this.current();
     const finding = this.finding(analysis, findingId);
     if (finding.kind !== 'contradiction') throw new ActionRefused('AI fixes are available for contradictions.');
@@ -438,6 +439,24 @@ Rules for your answer:
     saveUserSettings({ aiBackend: id });
     this.store.logAction({ at: nowIso(), kind: 'settings', summary: `AI review now uses ${AI_BACKEND_LABELS[id]}.` });
     return { message: `AI review and fixes now use ${AI_BACKEND_LABELS[id]}.` };
+  }
+
+  /** Allows or stops one AI tool receiving the user's files. Klosti asks before the first call to each tool. */
+  setAiConsent(backend: string, allow: boolean): ActionReply {
+    if (!(AI_BACKENDS as readonly string[]).includes(backend)) throw new ActionRefused('Pick Claude Code, the Anthropic API, Codex or Mistral Vibe.');
+    const id = backend as AiBackend;
+    const others = readAiConsent().filter(c => c !== id);
+    saveUserSettings({ aiConsent: allow ? [...others, id].sort() : others });
+    this.store.logAction({ at: nowIso(), kind: 'settings', summary: allow ? `Allowed ${AI_BACKEND_LABELS[id]} to receive files for the AI review and fixes.` : `Stopped sending files to ${AI_BACKEND_LABELS[id]}.` });
+    return { message: allow ? `${AI_BACKEND_LABELS[id]} can now receive your files for the AI review and fixes.` : `Klosti will ask again before sending anything to ${AI_BACKEND_LABELS[id]}.` };
+  }
+
+  setAiModel(model: string): ActionReply {
+    const choice = AI_MODELS.find(m => m.id === model);
+    if (!choice) throw new ActionRefused(`Pick ${AI_MODELS.map(m => m.label).join(' or ')}.`);
+    saveUserSettings({ aiModel: choice.id });
+    this.store.logAction({ at: nowIso(), kind: 'settings', summary: `AI review now uses ${choice.label}.` });
+    return { message: `Claude Code and the Anthropic API now answer with ${choice.label}.` };
   }
 
   /** The welcome screen: saves the first choices, marks onboarding done and runs the first scan. */

@@ -8,7 +8,7 @@ import { aiAvailability } from './ai.ts';
 import { analyze } from './analyze.ts';
 import { resolveConfig } from './config.ts';
 import { payload, renderPage } from './page.ts';
-import { planReview, runReview } from './review.ts';
+import { CHARS_PER_TOKEN, planReview, runReview } from './review.ts';
 import { scan } from './scan.ts';
 import { KlostiServer } from './server.ts';
 import { Store } from './store.ts';
@@ -36,7 +36,6 @@ Options
   -h, --help      Show this help`;
 
 const NOTIFY_NAME_LIMIT = 3;
-const CHARS_PER_TOKEN = 4;
 
 /** macOS only for now; the desktop app will handle notifications natively. */
 function notify(changes: { added: { name: string }[]; changed: { name: string }[]; removed: { name: string }[] }): void {
@@ -100,7 +99,7 @@ async function main(): Promise<void> {
       if (values['dry-run'] || !plan.jobs.length) { console.log(plan.jobs.length ? `Would make ${plan.jobs.length} calls, about ${Math.round(plan.inputChars / CHARS_PER_TOKEN).toLocaleString('en-US')} input tokens:\n  ${plan.pending.join('\n  ')}` : 'Everything is already reviewed.'); return; }
       const ai = aiAvailability();
       if (!ai.via) { console.log(ai.detail); return; }
-      console.log(`Reviewing ${plan.jobs.length} places with ${ai.label}...`);
+      console.log(`Reviewing ${plan.jobs.length} places with ${ai.label}. This sends the text of your rule files, skills and Claude memories to ${ai.provider}.`);
       const result = await runReview(plan, store, (done, total) => process.stdout.write(`\r  ${done}/${total}`));
       console.log(`\nReviewed ${result.reviewed}.${result.costUsd ? ` About $${result.costUsd.toFixed(2)} at list price.` : ''}`);
       result.failed.forEach(f => console.log(`  failed: ${f}`));
