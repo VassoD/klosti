@@ -28,3 +28,6 @@ site/public/downloads/
 
 # Static site copy for vercel deploy
 .deploy/
+
+# Personal Claude Code settings
+.claude/settings.local.json
