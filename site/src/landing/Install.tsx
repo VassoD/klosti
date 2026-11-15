@@ -10,7 +10,7 @@ export function Install(): React.JSX.Element {
       <p className="install-lead">
         {MAC_DOWNLOAD_URL
           ? "Klosti lives in your menu bar, keeps watch in the background, and lets you know when your agent setup changes."
-          : "One command scans your setup and opens Klosti in your browser. Nothing to install, and nothing leaves your machine."}
+          : "One command scans your setup and opens Klosti in your browser. Nothing to install, and nothing leaves your machine unless you ask for an AI review."}
       </p>
       <GetKlosti />
       {MAC_DOWNLOAD_URL ? (
