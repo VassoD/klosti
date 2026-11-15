@@ -1,13 +1,14 @@
 {
   "name": "klosti-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.1",
   "type": "module",
   "scripts": {
     "engine": "cd ../engine && npm run build && node ../app/scripts/build-engine.mjs",
     "icons": "tauri icon icon-src/icon.png",
     "dev": "npm run engine && tauri dev",
-    "build": "npm run engine && tauri build"
+    "build": "npm run engine && tauri build",
+    "package": "sh scripts/package-release.sh"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.0"

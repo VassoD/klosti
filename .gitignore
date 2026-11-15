@@ -18,6 +18,7 @@ app/node_modules/
 app/src-tauri/target/
 app/src-tauri/binaries/
 app/src-tauri/gen/
+app/release/
 
 # Marketing site build output
 site/.next/
