@@ -1,7 +1,7 @@
 {
   "name": "klosti-app",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "scripts": {
     "engine": "cd ../engine && npm run build && node ../app/scripts/build-engine.mjs",

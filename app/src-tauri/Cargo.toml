@@ -1,6 +1,6 @@
 [package]
 name = "klosti"
-version = "0.3.1"
+version = "0.3.2"
 description = "See every rule, skill, hook and MCP server your coding agents use."
 edition = "2021"
 
