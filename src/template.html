@@ -357,6 +357,11 @@ details{margin:10px 0;font-size:14px}
 summary{cursor:pointer}
 dialog.drawer{margin:0 0 0 auto;height:100vh;max-height:100vh;width:min(680px,100vw);border:0;border-left:1px solid var(--line);padding:0;background:var(--paper);color:var(--ink)}
 dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
+dialog.consent{width:min(520px,calc(100vw - 32px));border:1px solid var(--line);border-radius:var(--radius-lg);padding:24px;background:var(--paper);color:var(--ink);box-shadow:0 20px 60px rgb(20 18 15 / .25)}
+dialog.consent::backdrop{background:rgb(20 18 15 / .35)}
+dialog.consent h2{margin:0 0 12px;font-size:20px;line-height:1.3}
+dialog.consent p{margin:0 0 10px;line-height:1.5}
+dialog.consent .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
 .drawer-top{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;padding:14px 26px;background:var(--paper);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
 .close{font-size:22px;line-height:1;width:32px;height:32px;border-radius:var(--radius-sm)}
 .close:hover{background:var(--paper-2)}
@@ -403,6 +408,7 @@ dialog.drawer::backdrop{background:rgb(20 18 15 / .35)}
 </div>
 <div class="toast" id="updated" role="status" hidden><span>Something changed on disk.</span><button type="button" id="reload">Reload</button></div>
 <div class="toast" id="toast" role="status" hidden><span id="toast-text"></span><button id="toast-undo" type="button">Undo</button></div>
+<dialog class="consent" id="consent" aria-labelledby="consent-title"></dialog>
 <dialog class="drawer" id="drawer" aria-labelledby="drawer-title"><div class="drawer-top"><span id="drawer-kind"></span><button class="close" id="close" aria-label="Close">×</button></div><div class="drawer-body" id="drawer-body"></div></dialog>
 <script id="data" type="application/json">__DATA__</script>
 <script>
@@ -955,7 +961,7 @@ function welcome(ob){
     $('page').innerHTML=`<div class="welcome${entered?'':' enter'}">
     <div class="welcome-hero">${mark}<span class="welcome-word">klosti</span><svg class="welcome-run" viewBox="0 0 400 18" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 9C40 3 70 15 110 9S180 3 220 9S290 15 330 9S385 5 398 9"/></svg></div>
     <div class="welcome-intro" style="--d:.25s"><h1 class="lede">Welcome to Klosti</h1>
-    <p class="lede-sub">Klosti follows the thread from each coding agent to every rule, skill, hook and MCP server it loads. Two questions first, then it scans. Nothing leaves your computer.</p></div>
+    <p class="lede-sub">Klosti follows the thread from each coding agent to every rule, skill, hook and MCP server it loads. Two questions first, then it scans. Nothing leaves your computer unless you ask for an AI review or fix.</p></div>
     <div class="welcome-steps"><svg class="welcome-thread" aria-hidden="true"><path pathLength="1"/></svg>
     <section class="welcome-step" style="--d:.45s"><span class="welcome-bead" aria-hidden="true">1</span><h2 class="section">Which agents do you use?</h2><p class="section-sub">The others stay out of every list and out of the AI review. You can change this later in Settings.</p><div class="agent-pick">${agents}</div></section>
     <section class="welcome-step" style="--d:.65s"><span class="welcome-bead" aria-hidden="true">2</span><h2 class="section">Where do you keep your code?</h2><p class="section-sub">Klosti looks for projects in these folders. Uncheck a project to skip it. Your agent settings folders (${escape(ob.agentRoots.map(tilde).join(', ')||'~/.claude and others')}) are always read, because global rules and skills live there.</p><div class="setting-list">${folders}</div>
@@ -1033,8 +1039,12 @@ function settings(){
 /** The tool that runs the AI review and fixes. It is separate from the agents above: any installed one can review every agent. */
 function aiSection(){
   const ai=D.ai;if(!ai||!ai.options)return'';
-  const rows=ai.options.map(o=>{const current=o.id===ai.via;const action=current?'<span class="muted">In use</span>':o.available?(API?`<button class="btn-quiet" data-ai-backend="${esc(o.id)}">Use this</button>`:'<span class="muted">Installed</span>'):'<span class="muted">Not installed</span>';return`<div class="setting-row"><span><b>${esc(o.label)}</b></span>${action}</div>`;}).join('');
-  return`<h2 class="section">AI review and fixes</h2><p class="section-sub">Which installed tool answers when you click Review now or Fix with AI. It reviews every agent's setup, not only its own. It runs in an empty temporary folder, and Klosti applies any edit itself, with a backup.</p><div class="setting-list">${rows}</div>`;
+  const consents=new Set(ai.consents||[]);
+  const rows=ai.options.map(o=>{const current=o.id===ai.via;const action=current?'<span class="muted">In use</span>':o.available?(API?`<button class="btn-quiet" data-ai-backend="${esc(o.id)}">Use this</button>`:'<span class="muted">Installed</span>'):'<span class="muted">Not installed</span>';const allowed=consents.has(o.id)?`<span><span class="muted">Allowed to receive your files</span>${API?` <button class="btn-quiet" data-ai-consent-stop="${esc(o.id)}">Stop</button>`:''}</span>`:'<span></span>';return`<div class="setting-row"><span><b>${esc(o.label)}</b></span>${allowed}${action}</div>`;}).join('');
+  const usesModel=ai.via==='claude-code'||ai.via==='api';
+  const modelRows=usesModel?(ai.models||[]).map(m=>{const current=m.id===ai.model;const action=current?'<span class="muted">In use</span>':API&&!ai.modelFromEnv?`<button class="btn-quiet" data-ai-model="${esc(m.id)}">Use this</button>`:'<span></span>';return`<div class="setting-row"><span><b>${esc(m.label)}</b></span><span class="muted">${esc(m.note)}</span>${action}</div>`;}).join(''):'';
+  const modelBlock=usesModel?`<h2 class="section">Model</h2><p class="section-sub">${ai.modelFromEnv?`Set to ${esc(modelLabel(ai.model))} by the KLOSTI_MODEL variable, so it cannot be changed here.`:`The model ${esc(ai.label)} answers with. A first review covers every place and skill, so a smaller model uses less of your plan.`}</p><div class="setting-list">${modelRows}</div>`:'';
+  return`<h2 class="section">AI review and fixes</h2><p class="section-sub">Which installed tool answers when you click Review now or Fix with AI. It reviews every agent's setup, not only its own. It runs in an empty temporary folder, and Klosti applies any edit itself, with a backup. Before the first call to a tool, Klosti asks whether it may send your files there.</p><div class="setting-list">${rows}</div>${modelBlock}`;
 }
 function changes(){
   return`<h1 class="lede">Changes</h1><p class="lede-sub">One timeline: what you fixed from this page, plus anything the scans noticed on their own, like a new skill or a rule file edited by hand. The watcher rescans when your skill or plugin folders change, and every 3 hours.</p>
@@ -1127,6 +1137,10 @@ document.addEventListener('click',e=>{
   else if(d.toggleRoot){const f=d.toggleRoot;rememberChecks();state.expandedRoots.has(f)?state.expandedRoots.delete(f):state.expandedRoots.add(f);render();restoreChecks();}
   else if(d.addRoot){b.disabled=true;chooseFolder(API.token).then(path=>{b.disabled=false;if(!path)return;rememberChecks();if(!state.addedRoots.includes(path)&&!(D.settings?.candidates||[]).includes(path))state.addedRoots.push(path);render();restoreChecks();}).catch(err=>{b.disabled=false;showToast(err.message,null);});}
   else if(d.aiBackend){b.disabled=true;callApi('/api/ai-backend',{backend:d.aiBackend});}
+  else if(d.aiModel){b.disabled=true;callApi('/api/ai-model',{model:d.aiModel});}
+  else if(d.aiConsentStop){b.disabled=true;callApi('/api/ai-consent',{backend:d.aiConsentStop,allow:false});}
+  else if(d.consentAllow){allowAi(b);}
+  else if(d.consentCancel){$('consent').close();pendingAiRun=null;}
   else if(d.saveSettings){
     const picked=name=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i=>i.value);
     const agents=picked('agent'),roots=picked('root');
@@ -1144,10 +1158,10 @@ document.addEventListener('click',e=>{
   else if(d.restoreBackups){confirmThen(b,()=>callApi('/api/undo',{backups:JSON.parse(d.restoreBackups)}));}
   else if(d.restoreLine){b.disabled=true;b.textContent='Restoring…';callApi('/api/undo',{backup:d.restoreLine,open:d.open});}
   else if(d.resolve){b.disabled=true;callApi('/api/resolve',{finding:d.resolve,resolved:true});}
-  else if(d.fix){proposeFix(d.fix,b);}
+  else if(d.fix){withAiConsent('fix',()=>proposeFix(d.fix,b));}
   else if(d.applyFix){b.disabled=true;b.textContent='Applying…';callApi('/api/apply-fix',{proposal:d.applyFix});}
   else if(d.cancelFix){b.closest('.fix').remove();}
-  else if(d.runReview){b.disabled=true;b.textContent='Reviewing… this can take a minute';callApi('/api/review',{});}
+  else if(d.runReview){withAiConsent('review',()=>{b.disabled=true;b.textContent='Reviewing… this can take a minute';callApi('/api/review',{});});}
   else if(d.cancelLine){b.closest('.line-confirm').remove();}
   else if(d.removeLink){b.disabled=true;callApi('/api/remove-link',{finding:d.removeLink,path:d.path});}
   else if(d.shareSkill){b.disabled=true;callApi('/api/share-skill',{id:d.shareSkill,agents:JSON.parse(d.agents)});}
@@ -1184,6 +1198,40 @@ function confirmThen(button,action){
   const original=button.textContent;
   button.classList.add('confirming');button.textContent='Click again to confirm';
   setTimeout(()=>{if(!button.disabled){button.classList.remove('confirming');button.textContent=original;}},CONFIRM_MS);
+}
+/** A POST whose reply the page uses itself, without the reload that callApi does. */
+async function postJson(path,body){
+  const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Klosti-Token':API.token},body:JSON.stringify(body)});
+  const reply=await res.json().catch(()=>({error:'Unexpected reply from the server.'}));
+  if(!res.ok)throw new Error(reply.error||'That did not work.');
+  return reply;
+}
+const modelLabel=id=>(D.ai?.models||[]).find(m=>m.id===id)?.label||id;
+let pendingAiRun=null;
+/** Klosti asks once per AI tool before any of the user's files are sent to it. */
+async function withAiConsent(kind,run){
+  const ai=D.ai;
+  if(!ai||!ai.via){showToast(ai?.detail||'No AI tool is installed.',null);return;}
+  if(ai.consented){run();return;}
+  let plan=null;
+  if(kind==='review'){try{plan=await postJson('/api/review-plan',{});}catch(e){plan=null;}}
+  if(plan&&!plan.calls){showToast('Everything is already reviewed.',null);return;}
+  const what=kind==='review'?'The AI review sends the text of your rule files, skills and Claude memories':'This fix sends the text of the files in this issue';
+  const model=ai.model?`It answers with ${esc(modelLabel(ai.model))}`:`It answers with ${esc(ai.label)}'s own default model`;
+  const billing=ai.via==='api'?'and is billed to your API key':'and uses your own plan';
+  const size=plan?`<p>This review makes ${plan.calls} ${plan.calls===1?'call':'calls'}, about ${plan.tokens.toLocaleString('en-GB')} tokens of text.</p>`:'';
+  pendingAiRun=run;
+  $('consent').innerHTML=`<h2 id="consent-title">Send your files to ${esc(ai.label)}?</h2><p>${what} to <b>${esc(ai.provider)}</b>. ${model}, ${billing}.</p>${size}<p class="muted">Nothing is sent until you allow it. Klosti asks once for each AI tool, and you can stop it any time in Settings.</p><div class="actions"><button class="btn-primary" data-consent-allow="1">Allow and continue</button><button class="btn-quiet" data-consent-cancel="1">Cancel</button></div>`;
+  $('consent').showModal();
+}
+async function allowAi(button){
+  button.disabled=true;
+  try{
+    await postJson('/api/ai-consent',{backend:D.ai.via,allow:true});
+    D.ai.consented=true;D.ai.consents=[...new Set([...(D.ai.consents||[]),D.ai.via])];
+    $('consent').close();
+    const run=pendingAiRun;pendingAiRun=null;run?.();
+  }catch(err){button.disabled=false;showToast(err instanceof TypeError?'Klosti is not running. Start it with npx klosti.':err.message,null);}
 }
 async function callApi(path,body){
   try{

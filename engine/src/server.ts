@@ -4,10 +4,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { join } from 'node:path';
 import { z } from 'zod';
 import { ActionRefused, Actions, openInBrowser, pickFolder, rescan } from './actions.ts';
-import { AiRefusedError, AiUnavailableError } from './ai.ts';
+import { AiConsentRequiredError, AiRefusedError, AiUnavailableError, requireAiConsent } from './ai.ts';
 import { HOME, onboardingChoices, type ResolvedConfig } from './config.ts';
 import { payload, renderPage } from './page.ts';
-import { planReview, runReview } from './review.ts';
+import { CHARS_PER_TOKEN, planReview, runReview } from './review.ts';
 import type { Store } from './store.ts';
 
 const MAX_BODY_BYTES = 10_000;
@@ -22,7 +22,7 @@ const Body = z.object({
   backup: z.string().optional(), backups: z.array(z.string()).optional(), open: z.string().nullable().optional(),
   id: z.string().optional(), path: z.string().optional(), force: z.boolean().optional(), ignore: z.boolean().optional(),
   roots: z.array(z.string()).optional(), agents: z.array(z.string()).optional(), ignored: z.array(z.string()).optional(),
-  backend: z.string().optional(),
+  backend: z.string().optional(), allow: z.boolean().optional(), model: z.string().optional(),
 });
 
 export interface ServerOptions { port: number; watch: boolean; onChange?: (summary: ChangeSummary) => void }
@@ -126,6 +126,7 @@ export class KlostiServer {
       if (!reply) return this.send(res, 404, { error: 'Not found' });
       this.send(res, 200, { ok: true, ...reply });
     } catch (error) {
+      if (error instanceof AiConsentRequiredError) return this.send(res, 409, { error: error.message, code: error.code });
       if (error instanceof ActionRefused || error instanceof AiUnavailableError || error instanceof AiRefusedError) return this.send(res, 400, { error: error.message });
       if (error instanceof z.ZodError || error instanceof SyntaxError) return this.send(res, 400, { error: 'Malformed request.' });
       console.error(JSON.stringify({ level: 'error', at: new Date().toISOString(), path, error: error instanceof Error ? error.stack : String(error) }));
@@ -153,6 +154,12 @@ export class KlostiServer {
       case '/api/onboard': return this.serialize(() => changed({ ...a.onboard(body.roots ?? [], body.agents ?? [], body.ignored ?? []) }));
       case '/api/settings': return this.serialize(() => changed({ ...a.saveSettings(body.roots ?? [], body.agents ?? [], body.ignored) }));
       case '/api/ai-backend': return this.serialize(() => changed({ ...a.setAiBackend(body.backend ?? '') }));
+      case '/api/ai-consent': return this.serialize(() => changed({ ...a.setAiConsent(body.backend ?? '', body.allow ?? false) }));
+      case '/api/ai-model': return this.serialize(() => changed({ ...a.setAiModel(body.model ?? '') }));
+      case '/api/review-plan': {
+        const plan = planReview(a.current(), this.store, body.force ?? false, this.config.agents);
+        return { calls: plan.jobs.length, tokens: Math.round(plan.inputChars / CHARS_PER_TOKEN) };
+      }
       case '/api/ignore-folder': return this.serialize(() => changed({ ...a.ignoreFolder(body.path ?? '', body.ignore ?? true) }));
       case '/api/remove-link': return this.serialize(() => changed({ ...a.removeLink(body.finding ?? '', body.path ?? '') }));
       case '/api/share-skill': return this.serialize(() => changed({ ...a.shareSkill(body.id ?? '', body.agents ?? []) }));
@@ -161,6 +168,7 @@ export class KlostiServer {
       case '/api/review': {
         // Not queued with file changes: a review takes minutes and only writes its own cache, in synchronous steps.
         if (this.reviewing) throw new ActionRefused('A review is already running.');
+        requireAiConsent();
         const plan = planReview(a.current(), this.store, body.force ?? false, this.config.agents);
         if (!plan.jobs.length) return { message: 'Everything is already reviewed.' };
         this.reviewing = true;

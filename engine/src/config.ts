@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -42,6 +42,10 @@ export interface UserConfig {
   onboarded?: boolean;
   /** Which installed tool runs the AI review and fixes: claude-code, api, codex or vibe. Unset picks the first one found. */
   aiBackend?: string;
+  /** The model Claude Code and the Anthropic API answer with. Unset means the default. */
+  aiModel?: string;
+  /** The AI tools the user allowed to receive their files. Klosti asks before the first call to each one. */
+  aiConsent?: string[];
 }
 
 export class ConfigError extends Error {
@@ -55,7 +59,7 @@ function readUserConfig(): UserConfig {
     if (typeof parsed !== 'object' || parsed === null) throw new ConfigError('config must be a JSON object');
     const config = parsed as Record<string, unknown>;
     const strings = (value: unknown): string[] | undefined => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined);
-    return { roots: strings(config.roots), exclude: strings(config.exclude), ignore: strings(config.ignore), agents: strings(config.agents), onboarded: typeof config.onboarded === 'boolean' ? config.onboarded : undefined, replaceDefaultRoots: config.replaceDefaultRoots === true, aiBackend: typeof config.aiBackend === 'string' ? config.aiBackend : undefined };
+    return { roots: strings(config.roots), exclude: strings(config.exclude), ignore: strings(config.ignore), agents: strings(config.agents), onboarded: typeof config.onboarded === 'boolean' ? config.onboarded : undefined, replaceDefaultRoots: config.replaceDefaultRoots === true, aiBackend: typeof config.aiBackend === 'string' ? config.aiBackend : undefined, aiModel: typeof config.aiModel === 'string' ? config.aiModel : undefined, aiConsent: strings(config.aiConsent) };
   } catch (error) {
     throw new ConfigError(`Could not read ${CONFIG_FILE}: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -82,6 +86,20 @@ function defaultDataDir(): string {
   return brandDir(process.env.XDG_DATA_HOME ?? join(HOME, '.local', 'share'));
 }
 
+/**
+ * The folders that exist, each listed once. On macOS ~/code and ~/Code are the same folder, so each path is compared by
+ * its real location and shown with its real capitalization. A symlink keeps its own path, so project paths do not move.
+ */
+export function distinctFolders(paths: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const path of paths) {
+    let real: string;
+    try { real = realpathSync.native(path); } catch { continue; }
+    if (!seen.has(real)) seen.set(real, real.toLowerCase() === path.toLowerCase() ? real : path);
+  }
+  return [...seen.values()];
+}
+
 export const expandPath = (p: string): string => (p.startsWith('~/') ? join(HOME, p.slice(2)) : p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p) ? p : join(HOME, p));
 
 export function resolveConfig(overrides: { roots?: string[]; dataDir?: string } = {}): ResolvedConfig {
@@ -90,7 +108,7 @@ export function resolveConfig(overrides: { roots?: string[]; dataDir?: string } 
   const defaults = user.replaceDefaultRoots ? [] : DEFAULT_CODE_DIRS.map(d => join(HOME, d));
   const wanted = overrides.roots?.map(expand) ?? [...defaults, ...(user.roots ?? []).map(expand)];
   return {
-    codeRoots: [...new Set(wanted)].filter(p => existsSync(p)),
+    codeRoots: distinctFolders(wanted),
     agentRoots: AGENT_DIRS.map(d => join(HOME, d)).filter(p => existsSync(p)),
     excluded: [...new Set([...EXCLUDED_DIRS, ...(user.exclude ?? [])])],
     ignored: [...new Set((user.ignore ?? []).map(expand))],
@@ -105,7 +123,7 @@ export const MANAGED_CLAUDE_MD = platform() === 'darwin' ? '/Library/Application
 const tildePath = (p: string): string => (p.startsWith(`${HOME}/`) ? `~/${p.slice(HOME.length + 1)}` : p);
 
 /** Merges these settings into the config file, keeping every other setting as it was. */
-export function saveUserSettings(patch: Partial<Record<'roots' | 'ignore' | 'agents', string[]>> & { replaceDefaultRoots?: boolean; onboarded?: boolean; aiBackend?: string }): void {
+export function saveUserSettings(patch: Partial<Record<'roots' | 'ignore' | 'agents' | 'aiConsent', string[]>> & { replaceDefaultRoots?: boolean; onboarded?: boolean; aiBackend?: string; aiModel?: string }): void {
   const current: Record<string, unknown> = existsSync(CONFIG_FILE) ? JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as Record<string, unknown> : {};
   const next: Record<string, unknown> = { ...current, ...patch };
   for (const key of ['roots', 'ignore'] as const) if (patch[key]) next[key] = [...new Set(patch[key])].sort().map(tildePath);
@@ -122,8 +140,17 @@ export function readAiBackend(): string | undefined {
   try { return readUserConfig().aiBackend; } catch { return undefined; }
 }
 
+export function readAiModel(): string | undefined {
+  try { return readUserConfig().aiModel; } catch { return undefined; }
+}
+
+/** A broken config file means no consent, so Klosti asks again rather than sending files. */
+export function readAiConsent(): string[] {
+  try { return readUserConfig().aiConsent ?? []; } catch { return []; }
+}
+
 /** Code folders the settings can offer: the common ones that exist, plus any the user added. */
-export const rootCandidates = (config: ResolvedConfig): string[] => [...new Set([...DEFAULT_CODE_DIRS.map(d => join(HOME, d)).filter(p => existsSync(p)), ...config.codeRoots])];
+export const rootCandidates = (config: ResolvedConfig): string[] => distinctFolders([...DEFAULT_CODE_DIRS.map(d => join(HOME, d)), ...config.codeRoots]);
 
 export const CONFIG_PATH = CONFIG_FILE;
 
