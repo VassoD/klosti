@@ -857,10 +857,13 @@ function ignoredSection(){
   const form=API?`<div class="toolbar"><button class="btn-quiet" data-ignore-input="1">Choose a folder to ignore…</button></div>`:`<p class="muted">Add folders to <code>"ignore"</code> in ~/.config/klosti/config.json.</p>`;
   return`<h2 class="section">Folders you ignore</h2><p class="section-sub">Klosti skips these folders and everything inside them, so their rules, skills, hooks and MCP servers do not appear anywhere.</p>${rows||'<p class="muted">None yet.</p>'}${form}`;
 }
-/** Each folder's box lists its projects, and the ones that start unchecked, so this works while the folder is closed. */
-const folderProjects=root=>{try{return JSON.parse(root.dataset.projects||'[]');}catch(e){return[];}};
-const startsOff=root=>{try{return new Set(JSON.parse(root.dataset.off||'[]'));}catch(e){return new Set();}};
-const projectOn=(root,path)=>projectChoices.has(path)?projectChoices.get(path):!startsOff(root).has(path);
+/**
+ * Each folder's box lists its projects, and the ones that start unchecked, so this works while the folder is closed.
+ * These are function declarations, not consts: the welcome screen returns before this line runs, and still calls them.
+ */
+function folderProjects(root){try{return JSON.parse(root.dataset.projects||'[]');}catch(e){return[];}}
+function startsOff(root){try{return new Set(JSON.parse(root.dataset.off||'[]'));}catch(e){return new Set();}}
+function projectOn(root,path){return projectChoices.has(path)?projectChoices.get(path):!startsOff(root).has(path);}
 /** Half-filled when only some of a checked folder's projects are on. */
 function refreshFolderBoxes(){
   document.querySelectorAll('input[name="root"]').forEach(root=>{
@@ -888,7 +891,7 @@ function syncFolderTree(e){
 function uncheckedProjects(){
   return[...document.querySelectorAll('input[name="root"]:checked')].flatMap(root=>folderProjects(root).filter(p=>!projectOn(root,p)));
 }
-const listedProjects=()=>[...document.querySelectorAll('input[name="root"]')].flatMap(folderProjects);
+function listedProjects(){return[...document.querySelectorAll('input[name="root"]')].flatMap(folderProjects);}
 
 /** Asks the local engine to open the system folder chooser. Resolves to null when the user cancels. */
 function chooseFolder(token){
