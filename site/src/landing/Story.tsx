@@ -1,3 +1,5 @@
+import { GUIDE_POST_URL, STORY_POST_URL } from "@/landing/links";
+
 const AGENT_FILES = [
   { agent: "Claude Code", files: "~/.claude/CLAUDE.md, ./CLAUDE.md, .claude/skills/*/SKILL.md, settings.json hooks, ~/.claude.json" },
   { agent: "Codex", files: "~/.codex/AGENTS.md, ./AGENTS.md, ~/.codex/config.toml" },
@@ -24,6 +26,10 @@ export function Story(): React.JSX.Element {
         <p>
           Klosti is the thread. It follows every file each agent loads, in the order it loads them, so you can find your
           way back out.
+        </p>
+        <p>
+          The longer story: <a href={STORY_POST_URL}>why I built it</a>, and{" "}
+          <a href={GUIDE_POST_URL}>how to read your own harness</a>.
         </p>
       </div>
       <aside className="tangle" aria-label="Where your agents look for instructions">

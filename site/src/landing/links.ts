@@ -5,6 +5,9 @@ export const DOWNLOAD_PAGE = "/download";
 
 export const CLI_COMMAND = "npx klosti";
 
+export const STORY_POST_URL = "https://www.vassi.fyi/writing/what-was-the-agent-told";
+export const GUIDE_POST_URL = "https://www.vassi.fyi/writing/how-to-know-your-harness";
+
 export const PLATFORM_NOTE = "For macOS 11 or later, on Macs with Apple silicon";
 
 export const CLI_NOTE = "Runs locally on macOS, Linux and Windows. Requires Node 20 or later. Mac app coming soon.";
