@@ -1,6 +1,6 @@
 import { CopyCommand } from "@/landing/CopyCommand";
 import { GetKlosti } from "@/landing/GetKlosti";
-import { CLI_COMMAND, MAC_DOWNLOAD_URL } from "@/landing/links";
+import { CLI_COMMAND, MAC_DOWNLOAD_URL, MAC_INSTALL_COMMAND } from "@/landing/links";
 
 export function Install(): React.JSX.Element {
   return (
@@ -13,10 +13,15 @@ export function Install(): React.JSX.Element {
           : "One command scans your setup and opens Klosti in your browser. Nothing to install, and nothing leaves your machine."}
       </p>
       <GetKlosti />
-      {MAC_DOWNLOAD_URL && (
+      {MAC_DOWNLOAD_URL ? (
         <div className="cli-alt">
           <span>On Linux or Windows, or prefer the terminal?</span>
           <CopyCommand command={CLI_COMMAND} />
+        </div>
+      ) : (
+        <div className="cli-alt">
+          <span>Want it in your menu bar? The Mac app, for Apple silicon. Run the same command again to update.</span>
+          <CopyCommand command={MAC_INSTALL_COMMAND} />
         </div>
       )}
     </section>
